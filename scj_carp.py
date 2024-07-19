@@ -212,12 +212,14 @@ def main():
     parser=ArgumentParser()
     parser.add_argument('unimog')
     parser.add_argument('--alt',action='store_true',help='Activate alternative split calculation')
+    parser.add_argument("--core",action='store_true')
     args=parser.parse_args()
     with open(args.unimog) as f:
         gnms = readGenomes(f.readlines())
-        core = get_core(gnms)
-        gnms = project_to_gene_set(gnms,core)
-        print("Genome sizes after projection to core:",file=sys.stderr)
+        if args.core:
+            core = get_core(gnms)
+            gnms = project_to_gene_set(gnms,core)
+        print("Genome sizes%s:"%(" after projection to core" if args.core else ""),file=sys.stderr)
         for x,chrs in gnms:
             tlen = sum([len(chr) for _,chr in chrs])
             print(x,tlen,file=sys.stderr)
