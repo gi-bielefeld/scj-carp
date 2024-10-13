@@ -71,8 +71,8 @@ SCALE_RATES True
 SEED 0
 """
 
-from argparse import ArgumentParser()
-
+from argparse import ArgumentParser
+parser=ArgumentParser()
 parser.add_argument('transfer',type=float)
 
 args = parser.parse_args()
