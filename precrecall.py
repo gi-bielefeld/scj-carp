@@ -43,4 +43,4 @@ FN = [(u,v) for u,v in set(ground) if v not in resultdict.get(u,set())]
 
 precision=TP/(TP+FP)
 recall=TP/(TP+FN)
-print(precision,recall)
+print("%s,%s"%(precision,recall))

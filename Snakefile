@@ -7,6 +7,16 @@ ZOMBI_GNM_PARAMS = ZOMBI_HOME + 'Parameters/GenomeParameters.tsv'
 
 N_SAMPLES =100
 T_RATES = [0.1,0.25,0.5,0.75,1,2.5,5,7.5,10]
+TREE_SCALES = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+
+
+rule all_treescale_results:
+    input:
+        expand('treescale/z_treescale{scl}_sample{s}/agg.txt',scl=TREE_SCALES,s=range(1,N_SAMPLES+1))
+    output:
+        'treescale/treescale.txt'
+    shell:
+        'cat {input} > {output}'
 
 rule all_transfer:
     input:
@@ -26,9 +36,17 @@ rule all_default_zombi_trees:
         expand('zombi/z_default_sample{s}/T/ExtantTree.nwk',s=range(1,N_SAMPLES+1))
 
 
-rule aggregate_treescale_results:
+
+
+
+rule aggregate_treescale_results_hor:
     input:
-        #TODO
+        pr='pr/z_treescale{scl}_sample{s}/pr.txt',
+        ci='carp/measures/z_treescale{scl}_sample{s}/measure.txt'
+    output:
+        'treescale/z_treescale{scl}_sample{s}/agg.txt'
+    shell:
+        'echo {wildcards.s},$(cat {input.pr}),$(cat {input.ci})'
 
 rule aggregate_transfer_results:
     input:
@@ -37,7 +55,16 @@ rule aggregate_transfer_results:
         'transferexp/z_transfer{t}/results.txt'
     shell:
         'cat {input} |  sed "s/Carp index:/{wildcards.t}/" > {output}'
-    
+
+
+rule prec_recall:
+    input:
+        ca='carp/adjacencies/z_{params}/adj.txt',
+        gt='pangenome/z_{params}/adj_root.txt'
+    output:
+        'pr/z_{params}/pr.txt'
+    shell:
+        'python3 precrecall.py --ground {input.gt} --result {input.ca}'
 
 rule run_carp:
     input:
@@ -97,5 +124,24 @@ rule zombi_to_pangenome:
         tree='zombi/z_{params}/T/ExtantTree.nwk'
     output:
         'pangenome/z_{params}/unimog.txt'
+    shell:
+        'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ > {output}'
+
+
+rule root_adjacencies:
+    input:
+        'pangenome/z_{params}/root.txt'
+    output:
+        'pangenome/z_{params}/adj_root.txt'
+    shell:
+        'python3 genome2adj.py {input} > {output}'
+
+
+rule zombi_to_root:
+    input:
+        rgnm='zombi/z_{params}/G/Genomes/Root_GENOME.tsv',
+        tree='onlyroot.nwk'
+    output:
+        'pangenome/z_{params}/root.txt'
     shell:
         'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ > {output}'
