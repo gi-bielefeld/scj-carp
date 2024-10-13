@@ -25,6 +25,11 @@ rule all_default_zombi_trees:
     input:
         expand('zombi/z_default_sample{s}/T/ExtantTree.nwk',s=range(1,N_SAMPLES+1))
 
+
+rule aggregate_treescale_results:
+    input:
+        #TODO
+
 rule aggregate_transfer_results:
     input:
         expand('carp/measures/z_transfer{{t}}_sample{s}/measure.txt',s=range(1,N_SAMPLES+1))
@@ -51,6 +56,13 @@ rule setup_transfer_zombi:
         gp='zombi/z_transfer{t}_sample{s}/genome_params.tsv'
     shell:
         'cp %s {output.tp};python3 custom_param_files.py {wildcards.t} > {output.gp}'%(ZOMBI_TREE_PARAMS)
+
+rule setup_treescale_zombi:
+    output:
+        tp='zombi/z_treescale{scl}_sample{s}/tree_params.tsv',
+        gp='zombi/z_treescale{scl}_sample{s}/genome_params.tsv'
+    shell:
+        'python3 treescale.py {output.tp} {output.gp} {wildcards.scl}'
 
 rule setup_default_zombi:
     output:
