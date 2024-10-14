@@ -9,15 +9,15 @@ GENOME = """
 ## Rates represent the frequency (and fixation probability) of the different events measure in time units (see your Species Tree)
 ##
 #
-DUPLICATION f:1
+DUPLICATION f:{dupl}
 TRANSFER f:2
-LOSS f:3
+LOSS f:{loss}
 #
 ## The next three events use always genome-wise rates
 #
-INVERSION f:2
-TRANSPOSITION f:2
-ORIGINATION f:2
+INVERSION f:{inv}
+TRANSPOSITION f:{transp}
+ORIGINATION f:{orig}
 #
 ## Extensions. Extensions determine how many contiguous genes are affected by a single event
 #
@@ -54,7 +54,7 @@ PROFILES 1
 GENE_TREES 1
 RECONCILED_TREES 0
 VERBOSE 1
-SCALE_TREE {scale} 
+SCALE_TREE 0 
 #
 ### GF SPECIFIC PARAMETERS ###
 #
@@ -105,7 +105,7 @@ VERBOSE 0
 #
 ## SCALE_TREE = 0 not scale, SCALE_TREE != 0 scale CROWN to that number
 #
-SCALE_TREE {scale} 
+SCALE_TREE 0 
 #
 ### Tp SPECIFIC PARAMETERS ###
 #
@@ -135,11 +135,20 @@ SEED 0
 
 from argparse import ArgumentParser,FileType
 
+def scaled_genome(scale=1):
+    dupl=1*scale
+    loss=3*scale
+    inv=2*scale
+    transp=2*scale
+    orig=2*scale
+    return GENOME.format(dupl=dupl,loss=loss,inv=inv,transp=transp,orig=orig)
+
+
 parser = ArgumentParser()
 parser.add_argument('treeparams',type=FileType('w'))
 parser.add_argument('genomeparams',type=FileType('w'))
 parser.add_argument('scale',type=float)
 args = parser.parse_args()
 
-print(TREE.format(scale=args.scale),file=args.treeparams)
-print(GENOME.format(scale=args.scale),file=args.treeparams)
+print(TREE,file=args.treeparams)
+print(scaled_genome(scale=args.scale),file=args.treeparams)
