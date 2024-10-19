@@ -5,8 +5,8 @@ ZOMBI_BIN = ZOMBI_HOME+'Zombi.py'
 ZOMBI_TREE_PARAMS = ZOMBI_HOME + 'Parameters/SpeciesTreeParameters.tsv'
 ZOMBI_GNM_PARAMS = ZOMBI_HOME + 'Parameters/GenomeParameters.tsv'
 
-N_SAMPLES =100
-T_RATES = [0.1,0.25,0.5,0.75,1,2.5,5,7.5,10]
+N_SAMPLES = 100
+T_RATES = [0.125,0.25,0.5,1,2,4,8,16,32]
 TREE_SCALES = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
 
 
@@ -46,16 +46,25 @@ rule aggregate_treescale_results_hor:
     output:
         'treescale/z_treescale{scl}_sample{s}/agg.txt'
     shell:
-        'echo {wildcards.s},$(cat {input.pr}),$(cat {input.ci})'
+        'echo {wildcards.scl},$(cat {input.pr}),$(cat {input.ci} | sed "s/Carp index: //") > {output}'
 
 rule aggregate_transfer_results:
     input:
-        expand('carp/measures/z_transfer{{t}}_sample{s}/measure.txt',s=range(1,N_SAMPLES+1))
+        expand('transferexp/z_transfer{{t}}_sample{s}/summary.txt',s=range(1,N_SAMPLES+1))
     output:
         'transferexp/z_transfer{t}/results.txt'
     shell:
-        'cat {input} |  sed "s/Carp index:/{wildcards.t}/" > {output}'
+        'cat {input} > {output}'
 
+rule transfer_common:
+    input:
+        ms='carp/measures/z_transfer{t}_sample{s}/measure.txt',
+        pr='pr/z_transfer{t}_sample{s}/pr.txt'
+    output:
+        'transferexp/z_transfer{t}_sample{s}/summary.txt'
+    shell:
+        'echo $(cat {input.ms} |  sed "s/Carp index: /{wildcards.t}/,"),$(cat {input.pr}) > {output}'
+    
 
 rule prec_recall:
     input:
@@ -64,7 +73,7 @@ rule prec_recall:
     output:
         'pr/z_{params}/pr.txt'
     shell:
-        'python3 precrecall.py --ground {input.gt} --result {input.ca}'
+        'python3 precrecall.py --ground {input.gt} --result {input.ca} > {output}'
 
 rule run_carp:
     input:
@@ -104,8 +113,10 @@ rule zombi_tree:
         params='zombi/z_{params}/tree_params.tsv',
     output:
         'zombi/z_{params}/T/ExtantTree.nwk'
+    log:
+        'zombi/z_{params}/T/log.txt'
     shell:
-        'python3 %s T {input.params} zombi/z_{wildcards.params}/'%ZOMBI_BIN
+        'python3 %s T {input.params} zombi/z_{wildcards.params}/ > {log} 2>&1 '%ZOMBI_BIN
 
 
 rule zombi_genomes:
@@ -114,8 +125,10 @@ rule zombi_genomes:
         zombitree='zombi/z_{params}/T/ExtantTree.nwk'
     output:
         root='zombi/z_{params}/G/Genomes/Root_GENOME.tsv'
+    log:
+        'zombi/z_{params}/G/log.txt'
     shell:
-        'python3 %s G {input.params} zombi/z_{wildcards.params}/'%ZOMBI_BIN
+        'python3 %s G {input.params} zombi/z_{wildcards.params}/ > {log} 2>&1 '%ZOMBI_BIN
 
 
 rule zombi_to_pangenome:
@@ -144,4 +157,4 @@ rule zombi_to_root:
     output:
         'pangenome/z_{params}/root.txt'
     shell:
-        'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ > {output}'
+        'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ --onlyRoot > {output}'

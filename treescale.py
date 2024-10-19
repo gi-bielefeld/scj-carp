@@ -41,7 +41,7 @@ ALPHA 100
 #
 ## Genome size related parameters
 #
-INITIAL_GENOME_SIZE	100
+INITIAL_GENOME_SIZE	1000
 #
 ## MIN_GENOME_SIZE prevents genome to become too small. Any losses affecting genomes under this size will be ignored
 #
@@ -151,4 +151,4 @@ parser.add_argument('scale',type=float)
 args = parser.parse_args()
 
 print(TREE,file=args.treeparams)
-print(scaled_genome(scale=args.scale),file=args.treeparams)
+print(scaled_genome(scale=args.scale),file=args.genomeparams)

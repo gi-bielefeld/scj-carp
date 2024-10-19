@@ -37,10 +37,10 @@ result = read_adjacencies(args.result)
 grounddict = makedictl(ground)
 resultdict = makedictl(result)
 
-TP = [(u,v) for u,v in set(result) if v in grounddict.get(u,set())]
-FP = [(u,v) for u,v in set(result) if v not in grounddict.get(u,set())]
-FN = [(u,v) for u,v in set(ground) if v not in resultdict.get(u,set())]
+TP = len([(u,v) for u,v in set(result) if v in grounddict.get(u,set())])
+FP = len([(u,v) for u,v in set(result) if v not in grounddict.get(u,set())])
+FN = len([(u,v) for u,v in set(ground) if v not in resultdict.get(u,set())])
 
-precision=TP/(TP+FP)
-recall=TP/(TP+FN)
-print("%s,%s"%(precision,recall))
+precision=TP/(TP+FP) if TP+FP>0 else '-'
+recall=TP/(TP+FN) if TP+FN>0 else '-'
+print("{},{}".format(precision,recall))

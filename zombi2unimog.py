@@ -34,10 +34,14 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('extantTree')
     parser.add_argument('genomeDir')
+    parser.add_argument('--onlyRoot',action='store_true')
     args=parser.parse_args()
-    with open(args.extantTree) as tf:
-        tree = ''.join(tf.readlines())
-    leaves = get_tree_leaves(tree)
+    if not args.onlyRoot:
+        with open(args.extantTree) as tf:
+            tree = ''.join(tf.readlines())
+        leaves = get_tree_leaves(tree)
+    else:
+        leaves=['Root']
     for gnm in read_leaf_genomes(args.genomeDir,leaves):
         print(gnm)
 

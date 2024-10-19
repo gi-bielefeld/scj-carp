@@ -12,7 +12,7 @@ graph = ut.build_multi_bp_graph(gnms)
 for u,v in graph.edges():
     un,ux =  u
     vn,vx = v
-    print("{un} {ux}\t{vn} {vx}")
+    print("{un} {ux}\t{vn} {vx}".format(un=un,ux=ux,vn=vn,vx=vx))
 
     
 

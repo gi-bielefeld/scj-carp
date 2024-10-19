@@ -254,8 +254,10 @@ def main():
             core = get_core(gnms)
             gnms = project_to_gene_set(gnms,core)
         print("Genome sizes%s:"%(" after projection to core" if args.core else ""),file=sys.stderr)
+        pgnmsz=0
         for x,chrs in gnms:
             tlen = sum([len(chr) for _,chr in chrs])
+            pgnmsz+=tlen
             print(x,tlen,file=sys.stderr)
         colors = [x for x,_ in gnms]
         mbpg = build_multi_bp_graph(gnms)
@@ -268,7 +270,8 @@ def main():
                 print("{un} {ux}\t{vn} {vx}".format(un=un,ux=ux,vn=vn,vx=vx),file=args.write_carp_adjacencies)
         else:
             ci=calc_carp_index(mbpg)
-        print("Carp index: %d"%ci, file=args.write_measure if args.write_measure else sys.stdout)
+        cin=ci/pgnmsz
+        print("Carp index: %d,%d,%f"%(ci,pgnmsz,cin), file=args.write_measure if args.write_measure else sys.stdout)
 
         #print_mbpg(mbpg)
         #if args.alt:
