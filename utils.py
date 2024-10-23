@@ -112,8 +112,8 @@ def raw_extremities(chrm):
             xs = xs[::-1]
         exts.extend(xs)
     if chrm[0] == CHR_LINEAR:
-        t1 = (exts[0][0],exts[0][1]+TELO)
-        t2 = (exts[-1][0],exts[-1][1]+TELO)
+        t1 = (TELO,TELO)
+        t2 = (TELO,TELO)
         exts = [t1]+exts+[t2]
     return exts
 
