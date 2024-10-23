@@ -17,6 +17,9 @@ def hr2e(x):
     b=(xs[1][0:-1],xtr(xs[1][-1]))
     return tuple(sorted([a,b]))
 
+
+TLNODE = hr2e('oo')
+
 #linear graph
 def graph1():
         l = []
@@ -45,6 +48,8 @@ def graph3():
         mbpg = u.build_multi_bp_graph(l)
         return mbpg
 
+
+
 class TestMBPG(unittest.TestCase):
     def test_graph_linear(self):
         mbpg = graph1()
@@ -65,7 +70,26 @@ class TestMBPG(unittest.TestCase):
         self.assertEqual(nodes,set([(x,y) for x in "123" for y in [u.EXTREMITY_HEAD,u.EXTREMITY_TAIL]]+[(u.TELO,u.TELO)]))
         self.assertEqual(edges,set([hr2e(x) for x in ["1h,2t","2h,2h","2t,1t","3h,2t","2h,3t","1t,oo","1h,oo"]]))
 
-    
+
+class TestCARP(unittest.TestCase):
+     def test_graph_linear(self):
+        mbpg = graph1()
+        m, con,unc = c.calc_carp_index(mbpg,get_edge_partition=True)
+        cons = set([tuple(sorted(e)) for e in con])
+        uncs = set([tuple(sorted(e)) for e in unc])
+        #sanity checks
+        self.assertEqual(len(cons.intersection(uncs)),0)
+        alle = cons.union(uncs)
+        edges = set([tuple(sorted(e)) for e in mbpg.edges()])
+        for e in edges:
+            if TLNODE in e:
+                continue
+            self.assertIn(e,alle)
+        for e in alle:
+             self.assertIn(e,edges)
+        
+
+
 
 if __name__ == '__main__':
     unittest.main()
