@@ -37,10 +37,7 @@ def print_mbpg(mbpg):
 def main():
     parser=ArgumentParser()
     parser.add_argument('unimog')
-    parser.add_argument('--alt',action='store_true',help='Activate alternative split calculation')
     parser.add_argument("--core",action='store_true')
-    parser.add_argument("--greedy-tree",action='store_true')
-    parser.add_argument("--candidate-adjacencies",action='store_true')
     parser.add_argument("--write-measure",type=FileType('w'))
     parser.add_argument("--write-carp-adjacencies",type=FileType('w'))
     args=parser.parse_args()
