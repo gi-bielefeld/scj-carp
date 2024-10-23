@@ -15,6 +15,7 @@ def calc_carp_index(mbpg,get_edge_partition=False):
             continue
         if u==v:
             contested.append((u,v))
+            carp_index+=1
             continue
         clsu = [mbpg[u][x]['colors'] for x in mbpg[u] if x!=v]
         clsv = [mbpg[v][x]['colors'] for x in mbpg[v] if x!=u]
