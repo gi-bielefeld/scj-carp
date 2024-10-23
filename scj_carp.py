@@ -11,10 +11,12 @@ def calc_carp_index(mbpg,get_edge_partition=False):
     carp_index=0
     for u,v in mbpg.edges():
         if u == (TELO,TELO) or v == (TELO,TELO):
-            uncontested.append((u,v))
+            if get_edge_partition:
+                uncontested.append((u,v))
             continue
         if u==v:
-            contested.append((u,v))
+            if get_edge_partition:
+                contested.append((u,v))
             carp_index+=1
             continue
         clsu = [mbpg[u][x]['colors'] for x in mbpg[u] if x!=v]
