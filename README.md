@@ -23,10 +23,14 @@ A necessary preprocessing step for the current version is some form of collinear
 
 ## Snakemake Workflow
 
-To replicate the experiments from the manuscript, first change the variable `ZOMBI_HOME` in the snakefile to the installation of ZOMBI on your machine.
-Then navigate in your command line to the top directory of this repository.
+The workflow depends on both Snakemake and ZOMBI. Be sure to install that both of these are installed on your system.
 
-The two experiments can be run with the following rules:
+**Important**: Before running the workflow change the variable `ZOMBI_HOME` in the Snakefile to the installation of ZOMBI on your machine.
+
+To replicate the experiments from the manuscript, first navigate in your command line to the top directory of this repository.
+You can then run the two experiments with the following rules:
+
+
 | Experiment | Rule | Result File | Plot Scripts (`./plotscripts/`) |
 | ------| ------ | ----- | ---- |
 | Scaling rates of Adjacency modifying operations (Duplications, Losses, Inversions, Transpositions, Originations) | `all_treescale_results` | `treescale/treescale.txt` | `rearrangement_vs_measure.py`, `rearrangement_vs_precrec.py`|
@@ -34,9 +38,9 @@ The two experiments can be run with the following rules:
 
 To run the workflow, simply type `snakemake <rule> --cores <n-cores>`, where `<rule>` is one of the above rules and `<n-cores>` is the number of cores you want to use.
 
-For example, `snakemake all_transfer --cores 4`.
+For example, `snakemake all_treescale_results --cores 4`.
 
 The table of results (SCJ-CARP measure) and precision/recall can then be found in the corresponding result file.
-To replicate one of the pots, simply run the corresponding script, inputting the result file as an argument, i.e.
+To replicate one of the pots, simply run the corresponding script, inputting the result file as an argument, for example
 
 `python3 plotscripts/rearrangement_vs_precrec.py treescale/treescale.txt`.
