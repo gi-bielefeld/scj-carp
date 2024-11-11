@@ -1,6 +1,6 @@
 
-
-ZOMBI_HOME = '/prj/gsp/urm/spp_dcj_v2/tools/ZOMBI_01042020/'
+#before running, please change this variable to where zombi is installed on your machine 
+ZOMBI_HOME = '/path/to/your/zombi/installation/'
 ZOMBI_BIN = ZOMBI_HOME+'Zombi.py'
 ZOMBI_TREE_PARAMS = ZOMBI_HOME + 'Parameters/SpeciesTreeParameters.tsv'
 ZOMBI_GNM_PARAMS = ZOMBI_HOME + 'Parameters/GenomeParameters.tsv'
