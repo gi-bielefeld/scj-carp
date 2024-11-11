@@ -23,7 +23,7 @@ A necessary preprocessing step for the current version is some form of collinear
 
 ## Snakemake Workflow
 
-To replicate the experiments from the manuscript, first change the variable ZOMBI_HOME in the snakefile to the installation of ZOMBI on your machine.
+To replicate the experiments from the manuscript, first change the variable `ZOMBI_HOME` in the snakefile to the installation of ZOMBI on your machine.
 Then navigate in your command line to the top directory of this repository.
 
 The two experiments can be run with the following rules:
