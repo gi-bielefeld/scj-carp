@@ -23,7 +23,7 @@ A necessary preprocessing step for the current version is some form of collinear
 
 ## Snakemake Workflow
 
-The workflow depends on both Snakemake and ZOMBI. Be sure to install that both of these are installed on your system.
+The workflow depends on both Snakemake and ZOMBI. Be sure that both of these are installed on your system.
 
 **Important**: Before running the workflow change the variable `ZOMBI_HOME` in the Snakefile to the installation of ZOMBI on your machine.
 
