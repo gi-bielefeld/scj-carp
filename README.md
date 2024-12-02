@@ -10,7 +10,7 @@ A necessary preprocessing step for the current version is some form of collinear
 
 Run `python3 scj_carp.py <unimog>` where `<unimog>` contains all genomes in unimog format (https://bibiserv.cebitec.uni-bielefeld.de/dcj).
 
-The script will output a triple ("Carp index") consisting of the CARP measure, total number of marker occurrences in the Pangenome and relative CARP measure (CARP measure divided by Pangenome Size).
+The script will output a triple ("Carp index") consisting of the CARP measure, total number of marker occurrences in the pangenome and relative CARP measure (CARP measure divided by pangenome size).
 
 ### Optional Parameters
 
