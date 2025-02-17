@@ -10,7 +10,7 @@ get_measure = lambda e: float(e[1])
 X = 0
 YS = ['measure']
 YFUN = [get_measure]
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 20})
 
 
 
@@ -50,7 +50,8 @@ for y in YS:
 
 xs = sorted([x for x in data])
 #plt.legend([mp.Patch(color=colors[0])],['Precision'],loc=3)
-plt.xticks([math.log(float(x)) for x in xs],[str(x) for x in xs])
+tikps = sorted(xs,key=lambda x: float(x))[::2]
+plt.xticks([math.log(float(x)) for x in tikps],[str(x) for x in tikps])
 plt.xlabel("Transfer Rate")
 #plt.xscale('log')
 plt.ylabel("SCJ-CARP Measure")

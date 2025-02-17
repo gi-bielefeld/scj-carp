@@ -11,7 +11,7 @@ X = 0
 YS = ['measure']
 YFUN = [get_measure]
 
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 20})
 
 
 
@@ -51,7 +51,7 @@ for y in YS:
 
 
 #plt.legend([mp.Patch(color=colors[0])],['Precision'],loc=3)
-plt.xticks([i/10 for i in range(1,11)])
+plt.xticks([i/10 for i in range(1,11,3)])
 plt.xlabel("Rearrangement Scale")
 plt.ylabel("SCJ-CARP Measure")
 plt.show()

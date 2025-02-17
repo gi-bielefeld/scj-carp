@@ -12,7 +12,7 @@ get_rec = lambda e: float(e[5])
 X = 0
 YS = ['prec','recall']
 YFUN = [get_prec,get_rec]
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 20})
 
 
 
@@ -55,7 +55,9 @@ xs = sorted([x for x in data])
 plt.legend([mp.Patch(color=colors[0]),mp.Patch(color=colors[1])],['Precision','Recall'],loc=3)
 
 #plt.legend([mp.Patch(color=colors[0])],['Precision'],loc=3)
-plt.xticks([math.log(float(x)) for x in xs],[str(x) for x in xs])
+tikps = sorted(xs,key=lambda x: float(x))[::2]
+plt.xticks([math.log(float(x)) for x in tikps],[str(x) for x in tikps])
+plt.yticks([i/10 for i in range(4,11,2)])
 plt.xlabel("Transfer Rate")
 #plt.xscale('log')
 #plt.ylabel("SCJ-CARP Measure")
