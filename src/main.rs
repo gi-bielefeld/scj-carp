@@ -42,11 +42,11 @@ fn marker(xtr : u32) -> u32 {
 
 fn remove_node_from_adj(adjacencies : &mut HashMap<u32,HashSet<u32>>, xtr : u32) {
     let neighbors=adjacencies.get(&xtr).cloned().expect("aa");
-    adjacencies.remove(&xtr);
     for x in neighbors.iter() {
-        let v =  adjacencies.get_mut(&x).expect("A");
+        let v: &mut HashSet<u32> =  adjacencies.get_mut(&x).expect("A");
         v.remove(&xtr);
     }
+    adjacencies.remove(&xtr);
     for x in neighbors.iter() {
         for y in neighbors.iter() {
             if *x!=*y && *x!=xtr && *y != xtr {
@@ -60,7 +60,7 @@ fn trim_graph(ubg : &mut UBG,threshold : usize) {
     let mut to_remove = Vec::new();
     for (node,sz) in ubg.node_sizes.iter() {
         if *sz < threshold {
-            println!("Removing {} , i.e. {} (hd) {} (tl)",node,head(*node),tail(*node));
+            //println!("Removing {} , i.e. {} (hd) {} (tl)",node,head(*node),tail(*node));
             remove_node_from_adj(&mut ubg.adjacencies, head(*node));
             remove_node_from_adj(&mut ubg.adjacencies, tail(*node));
             to_remove.push(*node);   
