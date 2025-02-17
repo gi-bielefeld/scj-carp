@@ -104,12 +104,14 @@ fn parse_gfa(path: &str) -> io::Result<UBG>{
     let mut node_ids: HashMap<String, u32>   = HashMap::new();
     let mut rdr = ReaderBuilder::new().delimiter(b'\t').flexible(true).from_path(path)?;
     let mut curr_id = 1;
-    let mut i = 0;
+    let mut i :u32 = 0;
+    let mut n_edges :usize = 0;
     for res in rdr.records() {
         let x = res?;
         i+=1;
-        if i%1000==0 {
+        if i%1000000==0 {
             println!("Read {} lines.",i);
+            println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
         }
         if x.len()==0 {
             continue;
@@ -161,6 +163,7 @@ fn parse_gfa(path: &str) -> io::Result<UBG>{
             }
             adjacencies.get_mut(&axtr).expect("Horror").insert(bxtr);
             adjacencies.get_mut(&bxtr).expect("Horror").insert(axtr);
+            n_edges+=1;
         }
 
     }
