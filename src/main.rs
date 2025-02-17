@@ -98,13 +98,19 @@ fn add_telomoeres(ubg : &mut UBG) {
 }
 
 fn parse_gfa(path: &str) -> io::Result<UBG>{
+    println!("Read gfa.");
     let mut node_sizes = HashMap::new();
     let mut adjacencies = HashMap::new(); 
     let mut node_ids: HashMap<String, u32>   = HashMap::new();
     let mut rdr = ReaderBuilder::new().delimiter(b'\t').flexible(true).from_path(path)?;
     let mut curr_id = 1;
+    let mut i = 0;
     for res in rdr.records() {
         let x = res?;
+        i+=1;
+        if i%1000==0 {
+            println!("Read {} lines.",i);
+        }
         if x.len()==0 {
             continue;
         }
@@ -387,6 +393,7 @@ fn main() {
     
     let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
 
+    println!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
         (Some(gfaf),_) => parse_gfa(gfaf),
@@ -394,19 +401,12 @@ fn main() {
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
+    println!("Adding telomeres to complete graph.");
     add_telomoeres(&mut graph);
+    println!("Trimming graph.");
     trim_graph(&mut graph, thresh);
     add_telomoeres(&mut graph);
-    
-    for (k,v) in graph.node_sizes.iter() {
-        println!("{} {}",k,v)
-    }
-    for (k,v) in graph.adjacencies.iter() {
-        println!("Node {}:",hdtl_fmt(*k));
-        for x in v {
-            println!("{}",hdtl_fmt(*x));
-        }
-    }
+    println!("Calculating carp measure.");
     let (contested, uncontested) = calc_carp_measure(&graph);
     println!("Carp index: {}",contested.len());
     match matches.get_one::<String>("write-ancestor") {
