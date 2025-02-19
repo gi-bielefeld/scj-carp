@@ -36,7 +36,11 @@ rule all_default_zombi_trees:
         expand('zombi/z_default_sample{s}/T/ExtantTree.nwk',s=range(1,N_SAMPLES+1))
 
 
-
+rule cargo_build:
+    output:
+        './target/release/scj-carp-rust'
+    shell:
+        'cargo build -r'
 
 
 rule aggregate_treescale_results_hor:
@@ -77,14 +81,15 @@ rule prec_recall:
 
 rule run_carp:
     input:
-        pgnm='pangenome/z_{params}/unimog.txt'
+        pgnm='pangenome/z_{params}/unimog.txt',
+        binary = 'target/release/scj-carp-rust'
     output:
         ci='carp/measures/z_{params}/measure.txt',
         ca='carp/adjacencies/z_{params}/adj.txt'
     log:
         'carp/logs/z_{params}/log.txt'
     shell:
-        'python3 scj_carp.py {input} --write-measure {output.ci} --write-carp-adjacencies {output.ca} > {log}'
+        '{input.binary} --unimog {input.pgnm} --write-measure {output.ci} --write-ancestor {output.ca} > {log}'
 
 rule setup_transfer_zombi:
     output:

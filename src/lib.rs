@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use csv::ReaderBuilder;
 
+#[derive(Debug)]
 pub struct UBG {
     pub node_sizes : HashMap<u32,usize>,
     pub adjacencies : HashMap<u32,HashSet<u32>>,
@@ -36,6 +37,226 @@ pub fn marker(xtr : u32) -> u32 {
     xtr/2
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_hdtl() {
+        assert_eq!(4,tail(2));
+        assert_eq!(5,head(2));
+    }
+
+    #[test]
+    fn test_tail() {
+        for i in 0..42 {
+            assert!(is_tail(tail(i)));
+            assert!(!is_tail(head(i)));
+        }
+    }
+    #[test]
+    fn test_marker_conversion() {
+        for i in 0..42 {
+            assert_eq!(i,marker(head(i)));
+            assert_eq!(i,marker(tail(i)));
+        }
+    }
+
+    #[test]
+    fn test_trim_graph() {
+        let mut adj = HashMap :: new();
+        let mut node_siz = HashMap :: new();
+        node_siz.insert(1, 3);
+        node_siz.insert(2, 2);
+        node_siz.insert(3, 1);
+        for i in 1..=3 {
+            adj.insert(head(i), HashSet::new());
+            adj.insert(tail(i), HashSet::new());
+        }
+        adj.get_mut(&head(1)).expect("!").insert(tail(2));
+        adj.get_mut(&head(2)).expect("!").insert(tail(3));
+        adj.get_mut(&head(3)).expect("!").insert(tail(1));
+
+        adj.get_mut(&tail(1)).expect("!").insert(head(3));
+        adj.get_mut(&tail(2)).expect("!").insert(head(1));
+        adj.get_mut(&tail(3)).expect("!").insert(head(2));
+        let mut ubg = UBG {
+            adjacencies : adj,
+            node_ids : HashMap::new(),
+            node_sizes : node_siz
+
+        };
+        println!("{:?}",ubg.adjacencies);
+        trim_graph(&mut ubg, 2);
+        assert!(ubg.node_sizes.contains_key(&1));
+        assert!(ubg.node_sizes.contains_key(&2));
+        assert!(!ubg.node_sizes.contains_key(&3));
+        assert!(!ubg.adjacencies.contains_key(&head(3)));
+        assert!(!ubg.adjacencies.contains_key(&tail(3)));
+        println!("{:?}",ubg.adjacencies);
+        assert!(ubg.adjacencies.get(&head(2)).expect("!").contains(&tail(1)));
+        assert!(ubg.adjacencies.get(&tail(1)).expect("!").contains(&head(2)));
+        let mut remaining = HashSet::new();
+        for i in 1..=2 {
+            remaining.insert(head(i));
+            remaining.insert(tail(i));
+        }
+        for (x,neighb) in ubg.adjacencies {
+            assert!(remaining.contains(&x));
+            for y in neighb {
+                assert!(remaining.contains(&y));
+            }
+        };
+    }
+
+    fn general_ubg_sanity_check(ubg: &UBG) {
+        //forbidden telomere thing
+        assert!(!ubg.adjacencies.contains_key(&1));
+        for (m,_) in ubg.node_sizes.iter() {
+            assert!(ubg.adjacencies.contains_key(&tail(*m)));
+            assert!(ubg.adjacencies.contains_key(&head(*m)));
+        }
+        for (x,neighb) in ubg.adjacencies.iter() {
+            for y in neighb {
+                assert!(ubg.adjacencies.get(y).expect(".").contains(x));
+            }
+        }
+    }
+
+    #[test]
+    fn test_read_unimog() {
+        let ubg = parse_unimog("testfiles/test01.ug").expect("File should be readable");
+        general_ubg_sanity_check(&ubg);
+        for i in 1..=3 {
+            assert!(ubg.adjacencies.contains_key(&tail(i)));
+            assert!(ubg.adjacencies.contains_key(&head(i)));
+        }
+        assert!(ubg.adjacencies.get(&head(2)).expect(".").eq(&HashSet::from([head(1),tail(2)])));
+        assert!(ubg.adjacencies.get(&tail(2)).expect(".").eq(&HashSet::from([tail(3),head(2)])));
+        assert!(ubg.adjacencies.get(&head(1)).expect(".").eq(&HashSet::from([head(2)])));
+        assert!(ubg.adjacencies.get(&head(3)).expect(".").eq(&HashSet::from([tail(1)])));
+        assert!(ubg.adjacencies.get(&tail(3)).expect(".").eq(&HashSet::from([tail(2)])));
+        assert!(ubg.adjacencies.get(&tail(1)).expect(".").eq(&HashSet::from([head(3)])));
+    }
+
+    #[test]
+    fn test_unimog_new() {
+        let ubg = parse_unimog("testfiles/test05.ug").expect("File should be readable");
+        general_ubg_sanity_check(&ubg);
+        for i in ["1","2","5","6","7"] {
+            assert!(ubg.node_ids.contains_key(i));
+        }
+        for i in ["3","4","+5","+1"] {
+            assert!(!ubg.node_ids.contains_key(i));
+        }
+        let nd1 = *ubg.node_ids.get("1").expect(".");
+        let nd2 = *ubg.node_ids.get("2").expect(".");
+        let nd5 = *ubg.node_ids.get("5").expect(".");
+        let nd6 = *ubg.node_ids.get("6").expect(".");
+        let nd7 = *ubg.node_ids.get("7").expect(".");
+        assert!(ubg.adjacencies.get(&tail(nd1)).expect(".").eq(&HashSet::from([0])));
+        assert!(ubg.adjacencies.get(&head(nd1)).expect(".").eq(&HashSet::from([head(nd2),tail(nd6)])));
+        assert!(ubg.adjacencies.get(&head(nd2)).expect(".").eq(&HashSet::from([head(nd1)])));
+        assert!(ubg.adjacencies.get(&tail(nd2)).expect(".").eq(&HashSet::from([tail(nd5)])));
+        assert!(ubg.adjacencies.get(&tail(nd5)).expect(".").eq(&HashSet::from([tail(nd2)])));
+        assert!(ubg.adjacencies.get(&head(nd5)).expect(".").eq(&HashSet::from([0])));
+        assert!(ubg.adjacencies.get(&tail(nd7)).expect(".").eq(&HashSet::from([head(nd7)])));
+        assert!(ubg.adjacencies.get(&tail(nd6)).expect(".").eq(&HashSet::from([head(nd1)])));
+        assert!(ubg.adjacencies.get(&head(nd6)).expect(".").eq(&HashSet::from([0])));
+    }
+
+    #[test]
+    fn test_read_gfa_fail() {
+        for path in ["test01.ug","testfiles/test04.gfa","testfiles/test06.gfa","testfiles/test07.gfa"] {
+            let x = parse_gfa(path);
+            println!("{:?}",x);
+            assert!(x.is_err());
+        } 
+    }
+
+    #[test]
+    fn test_emoji() {
+        let mut ubg = parse_gfa("testfiles/test03.gfa").expect("File should be readable");
+        println!("nodes {:?}",ubg.node_ids);
+        println!("sizes {:?}",ubg.node_sizes);
+        add_telomeres(&mut ubg);
+        general_ubg_sanity_check(&ubg);
+        println!("{:?}",ubg.adjacencies);
+        assert!(ubg.adjacencies.get(&tail(1)).expect(".").eq(&HashSet::from([tail(2)])));
+        assert!(ubg.adjacencies.get(&tail(2)).expect(".").eq(&HashSet::from([tail(1)])));
+        assert!(ubg.adjacencies.get(&0).expect(".").eq(&HashSet::from([head(1),head(2)])));
+    }
+
+    #[test]
+    fn test_read_gfa() {
+        let mut ubg = parse_gfa("testfiles/test02.gfa").expect("File should be readable");
+        add_telomeres(&mut ubg);
+        general_ubg_sanity_check(&ubg);
+        for i in 1..=4 {
+            assert!(ubg.adjacencies.contains_key(&tail(i)));
+            assert!(ubg.adjacencies.contains_key(&head(i)));
+        }
+        let correct_sizes = HashMap::from([(1,5),(2,2),(3,0),(4,6)]);
+        for i in 1..=4 {
+            assert_eq!(ubg.node_sizes.get(&i).expect("!"),correct_sizes.get(&i).expect("."));
+        }
+        assert!(ubg.adjacencies.get(&head(1)).expect(".").eq(&HashSet::from([tail(4)])));
+        assert!(ubg.adjacencies.get(&head(2)).expect(".").eq(&HashSet::from([tail(4)])));
+        assert!(ubg.adjacencies.get(&tail(4)).expect(".").eq(&HashSet::from([head(1),head(2)])));
+        assert!(ubg.adjacencies.get(&tail(3)).expect(".").eq(&HashSet::from([tail(2)])));
+        assert!(ubg.adjacencies.get(&tail(2)).expect(".").eq(&HashSet::from([tail(3)])));
+        assert!(ubg.adjacencies.get(&head(3)).expect(".").eq(&HashSet::from([head(4)])));
+        assert!(ubg.adjacencies.get(&tail(1)).expect(".").eq(&HashSet::from([head(4)])));
+        assert!(ubg.adjacencies.get(&head(4)).expect(".").eq(&HashSet::from([tail(1),head(3)])));
+    }
+
+    fn carp_sanity_check(ubg : &UBG, contested : &HashSet<(u32,u32)>, uncontested : &HashSet<(u32,u32)>) {
+        let mut all = HashSet::new();
+        for (x,nghb) in ubg.adjacencies.iter() {
+            for y in nghb {
+                all.insert(canonicize((*x,*y)));
+            }
+        }
+        assert!(contested.is_subset(&all));
+        assert!(uncontested.is_subset(&all));
+        assert!(contested.is_disjoint(uncontested));
+        let union : HashSet<(u32,u32)> = contested.union(uncontested).cloned().collect();
+        assert_eq!(all,union);
+        for (x,y) in contested {
+            assert!(ubg.adjacencies.get(x).expect("!").len()>1 
+                || ubg.adjacencies.get(y).expect("!").len()>1);
+            assert!(*x!=0 && *y!=0);
+        }
+        for (x,y) in uncontested {
+            assert!(ubg.adjacencies.get(x).expect("!").len()==1 
+                && ubg.adjacencies.get(y).expect("!").len()==1);
+            assert!(ubg.adjacencies.get(x).expect("!").contains(y)
+                && ubg.adjacencies.get(y).expect("!").contains(x))
+        }
+    }
+
+    #[test]
+    fn test_carp_eva() {
+        let ubg = parse_gfa("testfiles/test02.gfa").expect("File should be readable");
+        let (contested,uncontested) = calc_carp_measure(&ubg);
+        carp_sanity_check(&ubg, &contested, &uncontested);
+        assert!(contested.len()==4);
+        assert!(uncontested.len()==1);
+    }
+
+    #[test]
+    fn test_back_map() {
+        let m = HashMap::from([(1,2),(3,4),(5,6)]);
+        let r = reverse_map(&m);
+        for (a,b) in m.iter() {
+            assert!(r.get(b).expect(".")==a)
+        }
+        for (a,b) in r.iter() {
+            assert!(m.get(b).expect(".")==a)
+        }
+    }
+}
+
+
 fn remove_node_from_adj(adjacencies : &mut HashMap<u32,HashSet<u32>>, xtr : u32) {
     let neighbors=adjacencies.get(&xtr).cloned().expect("aa");
     for x in neighbors.iter() {
@@ -43,22 +264,28 @@ fn remove_node_from_adj(adjacencies : &mut HashMap<u32,HashSet<u32>>, xtr : u32)
         v.remove(&xtr);
     }
     adjacencies.remove(&xtr);
-    for x in neighbors.iter() {
-        for y in neighbors.iter() {
-            if *x!=*y && *x!=xtr && *y != xtr {
-                adjacencies.get_mut(x).expect("Neighbor does not have any adjacencies").insert(*y);
-            }
-        }
-    }
 }
+
+
 
 pub fn trim_graph(ubg : &mut UBG,threshold : usize) {
     let mut to_remove = Vec::new();
     for (node,sz) in ubg.node_sizes.iter() {
         if *sz < threshold {
             //println!("Removing {} , i.e. {} (hd) {} (tl)",node,head(*node),tail(*node));
-            remove_node_from_adj(&mut ubg.adjacencies, head(*node));
-            remove_node_from_adj(&mut ubg.adjacencies, tail(*node));
+            let hd = head(*node);
+            let tl = tail(*node);
+            let nh = ubg.adjacencies.get(&hd).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
+            let nt = ubg.adjacencies.get(&tl).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
+            //add adjacencies between the neighboring markers
+            for x in nh.iter() {
+                for y in nt.iter() {
+                    ubg.adjacencies.get_mut(&x).expect("!").insert(*y);
+                    ubg.adjacencies.get_mut(&y).expect("!").insert(*x);
+                }
+            }
+            remove_node_from_adj(&mut ubg.adjacencies, hd);
+            remove_node_from_adj(&mut ubg.adjacencies, tl);
             to_remove.push(*node);   
         }
     }
@@ -85,8 +312,10 @@ fn check_add_tel(ubg : &mut UBG, n : u32) {
     
 }
 
-pub fn add_telomoeres(ubg : &mut UBG) {
+pub fn add_telomeres(ubg : &mut UBG) {
+    println!("{:?}",ubg.node_sizes);
     for (node,_) in ubg.node_sizes.clone().iter() {
+        println!("{}",node);
         check_add_tel(ubg, head(*node));
         check_add_tel(ubg, tail(*node));
 
@@ -98,7 +327,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
     let mut node_sizes = HashMap::new();
     let mut adjacencies = HashMap::new(); 
     let mut node_ids: HashMap<String, u32>   = HashMap::new();
-    let mut rdr = ReaderBuilder::new().delimiter(b'\t').flexible(true).from_path(path)?;
+    let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
     let mut curr_id = 1;
     let mut i :u32 = 0;
     let mut n_edges :usize = 0;
@@ -117,6 +346,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
             None => return Err(io::Error::new(io::ErrorKind::Other,"Non-empty line is empty")),
             Some(y) => y
         };
+        
         if entrytype.eq("S") {
             let seg_name = x.get(1);
             let seg_str = x.get(2);
@@ -173,7 +403,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
 }
 
 
-pub fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : u32) -> (u32,bool,u32) {
+fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : u32) -> (u32,bool,u32) {
     let mut workslice = markerstr;
     let mut is_forward = true;
     let mut curr_id = curr_id;
