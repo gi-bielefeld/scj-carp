@@ -5,8 +5,8 @@ import matplotlib.patches as mp
 import math
 get_measure = lambda e: float(e[1])
 
-get_prec = lambda e: float(e[4])
-get_rec = lambda e: float(e[5])
+get_prec = lambda e: float(e[2])
+get_rec = lambda e: float(e[3])
 
 
 X = 0
