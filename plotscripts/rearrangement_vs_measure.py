@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 
 from argparse import ArgumentParser
 import matplotlib.patches as mp
+from scipy.stats import spearmanr,pearsonr
 
 get_measure = lambda e: float(e[3])
 
@@ -43,14 +44,21 @@ colors = []
 for y in YS:
     positions = []
     datapoints = []
+    all = []
     for x, datapointdict in data.items():
         datapoints.append(datapointdict[y])
         positions.append(float(x))
+        all.extend([(float(x),w) for w in datapointdict[y]])
+    allx = [w[0] for w in all]
+    ally = [w[1] for w in all]
+    print("x vs {} pearsonr: {}".format(y,pearsonr(allx,ally)))
+    print("x vs {} spearmanr: {}".format(y,spearmanr(allx,ally)))
     bds = plt.violinplot(datapoints,positions,widths=0.05,showmedians=True)
     colors.append(bds['bodies'][0].get_facecolor())
 
 
 #plt.legend([mp.Patch(color=colors[0])],['Precision'],loc=3)
+
 plt.xticks([i/10 for i in range(1,11,3)])
 plt.xlabel("Rearrangement Scale")
 plt.ylabel("SCJ-CARP Measure")

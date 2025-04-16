@@ -338,16 +338,13 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
             println!("Read {} lines.",i);
             println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
         }
-        if x.len()==0 {
-            continue;
-        }
-        let entrytype = x.get(0);
-        let entrytype= match entrytype {
-            None => return Err(io::Error::new(io::ErrorKind::Other,"Non-empty line is empty")),
+  
+        let entrytype= match x.get(0) {
+            None => continue,
             Some(y) => y
         };
         
-        if entrytype.eq("S") {
+        if entrytype=="S" {
             let seg_name = x.get(1);
             let seg_str = x.get(2);
             let seg_name= match seg_name {
@@ -365,7 +362,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
             }
             
             
-        } else if entrytype.eq("L") {
+        } else if entrytype == "L" {
             let (sega,segb) = match  (x.get(1),x.get(3)) {
                 (Some(a),Some(b)) => (a,b),
                 (_,_) => return Err(io::Error::new(io::ErrorKind::Other,format!("Malformed link: {:?} in line {}",x,i)))
@@ -398,9 +395,9 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
     println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
     
     Ok(UBG {
-        node_sizes:node_sizes,
-        adjacencies:adjacencies,
-        node_ids:node_ids
+        node_sizes,
+        adjacencies,
+        node_ids
     })
 }
 
@@ -445,6 +442,8 @@ pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
     (xta,xtb)
 }
 
+
+//TODO Make constructor etc
 pub fn parse_unimog(path : &str) -> io::Result<UBG> {
     let node_sizes = HashMap::new();
     let mut adjacencies :HashMap<u32, HashSet<u32>> = HashMap::new();
@@ -458,11 +457,9 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
             continue;
         }
         let mut line = &line[..];
-        let mut i = line.find(" ");
         let mut first = None;
         let mut last = None;
-        while !i.is_none() {
-            let j = i.expect("Suddenly none");
+        while let Some(j) =  line.find(" ") {
             let m = &line[0..j];
             
             println!("{}",m);
@@ -473,44 +470,28 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
             if first.is_none() {
                 first=Some((is_forward,marker));
             }
-            if !last.is_none() {
-                let (xta,xtb) = to_adjacency(last.expect("there"),(is_forward,marker));
-                if !adjacencies.contains_key(&xta) {
-                    adjacencies.insert(xta, HashSet::new());
-                }
-                if !adjacencies.contains_key(&xtb) {
-                    adjacencies.insert(xtb, HashSet::new());
-                }
-                adjacencies.get_mut(&xta).expect("A").insert(xtb);
-                adjacencies.get_mut(&xtb).expect("A").insert(xta);
+            if let Some(last) = last {
+                let (xta,xtb) = to_adjacency(last,(is_forward,marker));
+                adjacencies.entry(xta).or_insert(HashSet::new()).insert(xtb);
+                adjacencies.entry(xtb).or_insert(HashSet::new()).insert(xta);
             }
             line = &line[j+1..];
             last = Some((is_forward,marker));
             if line.starts_with(")") || line.starts_with("|") {
                 break;
             }
-            i = line.find(" ");
         }
         if let Some((ifa,ma)) = last {
             let (ifb,mb) = first.expect("If a last marker exists, there must be a first marker");
             let (xta,xtb) = to_adjacency((ifa,ma),(ifb,mb));
-            if !adjacencies.contains_key(&xta) {
-                adjacencies.insert(xta, HashSet::new());
-            }
-            if !adjacencies.contains_key(&xtb) {
-                adjacencies.insert(xtb, HashSet::new());
-            }
             if line.starts_with(")") {
-                adjacencies.get_mut(&xta).expect("A").insert(xtb);
-                adjacencies.get_mut(&xtb).expect("A").insert(xta);
+                adjacencies.entry(xta).or_insert(HashSet::new()).insert(xtb);
+                adjacencies.entry(xtb).or_insert(HashSet::new()).insert(xta);
             } else if line.starts_with("|") {
-                if !adjacencies.contains_key(&0) {
-                    adjacencies.insert(0, HashSet::new());
-                }
-                adjacencies.get_mut(&0).expect("A").insert(xtb);
-                adjacencies.get_mut(&0).expect("A").insert(xta);
-                adjacencies.get_mut(&xta).expect("A").insert(0);
-                adjacencies.get_mut(&xtb).expect("A").insert(0);
+                adjacencies.entry(0).or_insert(HashSet::new()).insert(xtb);
+                adjacencies.entry(0).or_insert(HashSet::new()).insert(xta);
+                adjacencies.entry(xta).or_insert(HashSet::new()).insert(0);
+                adjacencies.entry(xtb).or_insert(HashSet::new()).insert(0);
             } else {
                 return Err(io::Error::new(io::ErrorKind::Other,"Invalid chromosome end."));
             }
@@ -518,24 +499,21 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
 
     }
     Ok(UBG {
-        node_sizes:node_sizes,
-        adjacencies:adjacencies,
-        node_ids:node_ids
+        node_sizes,
+        adjacencies,
+        node_ids
     })
 }
 
 
 fn get_or_set_node_id(node_ids: &mut HashMap<String, u32>, curr_id: u32, seg_name: String) -> (u32,u32){
-    let mut new_id = curr_id;
-    let n_id;
-    if !(node_ids.contains_key(&seg_name)) {
-        node_ids.insert(seg_name, curr_id);
-        n_id = new_id;
-        new_id+=1;
+    let n_id = *node_ids.entry(seg_name).or_insert(curr_id);
+    let new_id = if curr_id==n_id{
+        curr_id+1
     } else {
-        n_id = *node_ids.get(&seg_name).expect("This shouldn't happen.");
-    }
-    return (new_id,n_id)
+        curr_id
+    };
+    (new_id,n_id)
 }
 
 fn canonicize((a,b):(u32,u32)) -> (u32,u32) {
@@ -546,22 +524,19 @@ fn canonicize((a,b):(u32,u32)) -> (u32,u32) {
     }
 }
 
-
 pub fn calc_carp_measure(ubg : &UBG) -> (HashSet<(u32,u32)>,HashSet<(u32,u32)>){
     let mut contested = HashSet::new();
     let mut uncontested = HashSet::new();
-    for (xtr,neighb) in ubg.adjacencies.iter() {
+    for (xtr,neighb) in &ubg.adjacencies {
         if *xtr <= 1 {
             continue
         }
-    
         let is_contested=neighb.len()>1;
-        for nxtr in neighb.iter() {
+        for nxtr in neighb {
             if *nxtr <= 1 {
                 continue;
             }
             let e =canonicize((*nxtr,*xtr));
-
             if is_contested {
                 contested.insert(e);
                 uncontested.remove(&e);
@@ -579,10 +554,9 @@ where
 K : std::hash::Hash+Clone,
 V : Eq+std::hash::Hash+Clone
 {
-    let mut rm = HashMap::new();
+    let mut reversed = HashMap::new();
     for (a,b) in m {
-        
-        rm.insert(b.clone(),a.clone());
+        reversed.insert(b.clone(),a.clone());
     }
-    rm
+    reversed
 }

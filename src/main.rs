@@ -36,6 +36,7 @@ fn measure_to_file(p : &str, m : usize) {
 }
 
 fn main() {
+    //TODO: make struct
     let matches = Command::new("scj-carp")
         .arg(arg!(-s --"size-thresh" <st> "Size threshold for nodes (nodes of lower sizes are discarded)")
             .value_parser(value_parser!(usize))
@@ -67,12 +68,10 @@ fn main() {
     let (contested, uncontested) = calc_carp_measure(&graph);
     let m = contested.len();
     println!("Carp index: {}",m);
-    match matches.get_one::<String>("write-measure") {
-        None => (),
-        Some(p) => measure_to_file(p, m)
-    };
-    match matches.get_one::<String>("write-ancestor") {
-        None => (),
-        Some(p) => output_ancestral_adj(&graph, &uncontested,&mut File::create(p).expect("Could not create output file."))
-    };
+    if let Some(p)=  matches.get_one::<String>("write-measure") {
+        measure_to_file(p, m);
+    }
+    if let Some(p)=  matches.get_one::<String>("write-ancestor") {
+        output_ancestral_adj(&graph, &uncontested,&mut File::create(p).expect("Could not create output file."));
+    }
 }
