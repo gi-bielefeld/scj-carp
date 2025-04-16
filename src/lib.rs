@@ -313,9 +313,9 @@ fn check_add_tel(ubg : &mut UBG, n : u32) {
 }
 
 pub fn add_telomeres(ubg : &mut UBG) {
-    println!("{:?}",ubg.node_sizes);
+    //println!("{:?}",ubg.node_sizes);
     for (node,_) in ubg.node_sizes.clone().iter() {
-        println!("{}",node);
+        //println!("{}",node);
         check_add_tel(ubg, head(*node));
         check_add_tel(ubg, tail(*node));
 
@@ -368,7 +368,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
         } else if entrytype.eq("L") {
             let (sega,segb) = match  (x.get(1),x.get(3)) {
                 (Some(a),Some(b)) => (a,b),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,format!("Malformed link: {:?} in line {}",x,i)))
             };
             let aid;
             let bid;
@@ -379,7 +379,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
                 (Some("+"),Some("-")) => (head(aid),head(bid)),
                 (Some("-"),Some("+")) => (tail(aid),tail(bid)),
                 (Some("-"),Some("-")) => (tail(aid),head(bid)),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,format!("Malformed link: {:?} in line {}",x,i)))
             };
             if !adjacencies.contains_key(&axtr) {
                 adjacencies.insert(axtr,HashSet::new());
@@ -393,7 +393,9 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
         }
 
     }
-    
+    println!("GFA file parsing done.");
+    println!("Read {} lines.",i);
+    println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
     
     Ok(UBG {
         node_sizes:node_sizes,
@@ -428,7 +430,7 @@ fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : 
 
 
 pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
-    println!("ma {ma} mb {mb}");
+    //println!("ma {ma} mb {mb}");
     let xta = if ifa {
         head(ma)
     } else {
@@ -439,7 +441,7 @@ pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
     } else {
         head(mb)
     };
-    println!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
+    //println!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
     (xta,xtb)
 }
 
