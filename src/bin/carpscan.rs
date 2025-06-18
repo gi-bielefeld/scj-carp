@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{self, Write};
+use std::collections::{HashMap};
+use std::io::{self};
 use clap::{arg, value_parser, ArgGroup, Command};
 use scj_carp_rust::*;
 
 
-fn scan_graph(graph : &UBG,max_depth :usize) -> HashMap<u32, u32>{
+fn scan_graph(graph : &UBG,max_depth :usize) -> HashMap<Marker, usize>{
     eprintln!("Scanning graph...");
     let mut node_complexities = HashMap::new();
     let tot_size = graph.node_ids.len();
@@ -27,8 +26,8 @@ fn scan_graph(graph : &UBG,max_depth :usize) -> HashMap<u32, u32>{
     node_complexities
 }
 
-fn histogram(node_complexities : &HashMap<u32,u32>) -> HashMap<u32,u32> {
-    let mut hist : HashMap<u32,u32> = HashMap::new();
+fn histogram(node_complexities : &HashMap<Marker,usize>) -> HashMap<usize,usize> {
+    let mut hist : HashMap<usize,usize> = HashMap::new();
     for (_, ci) in node_complexities {
         let count = hist.entry(*ci).or_insert(0);
         *count+=1;
@@ -36,10 +35,10 @@ fn histogram(node_complexities : &HashMap<u32,u32>) -> HashMap<u32,u32> {
     hist
 }
 
-fn top_percentile(node_complexities : &HashMap<u32,u32>,percentile : f64) -> Vec<u32> {
+fn top_percentile(node_complexities : &HashMap<Marker,usize>,percentile : f64) -> Vec<Marker> {
     let num_nodes = node_complexities.len();
     let hist = histogram(&node_complexities);
-    let mut hist_entries : Vec<u32>= hist.keys().cloned().collect();
+    let mut hist_entries : Vec<usize>= hist.keys().cloned().collect();
     hist_entries.sort();
     let mut count = 0;
     let mut thresh_val = 0;

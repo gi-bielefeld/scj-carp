@@ -6,21 +6,25 @@ use std::cmp::Ordering;
 
 #[derive(Debug)]
 pub struct UBG {
-    pub node_sizes : HashMap<u32,usize>,
-    pub adjacencies : HashMap<u32,HashSet<u32>>,
-    pub node_ids : HashMap<String,u32>
+    pub node_sizes : HashMap<Marker,usize>,
+    pub adjacencies : HashMap<Extremity,HashSet<Extremity>>,
+    pub node_ids : HashMap<String,Marker>
 }
 
 
-pub fn head(n : u32) -> u32 {
+pub type Marker = usize;
+pub type Extremity = usize;
+pub type Adjacency = (Extremity,Extremity);
+
+pub fn head(n : Marker) -> Extremity {
     2*n+1
 }
 
-pub fn tail(n : u32) -> u32 {
+pub fn tail(n : Marker) -> Extremity {
     2*n
 }
 
-pub fn other(n : u32) -> u32{
+pub fn other(n : Extremity) -> Extremity{
     if n == 0 {
         return 0;
     }
@@ -31,14 +35,14 @@ pub fn other(n : u32) -> u32{
     }
 }
 
-pub fn is_tail(n:u32) -> bool{
+pub fn is_tail(n:Extremity) -> bool{
     match n%2 {
         0 => true,
         _ => false
     }
 }
 
-pub fn hdtl_fmt(n :u32) -> String {
+pub fn hdtl_fmt(n :Extremity) -> String {
     let x = match n%2 {
         0 => "t",
         _ => "h"
@@ -46,7 +50,7 @@ pub fn hdtl_fmt(n :u32) -> String {
     marker(n).to_string()+x
 }
 
-pub fn marker(xtr : u32) -> u32 {
+pub fn marker(xtr : Extremity) -> Marker {
     xtr/2
 }
 
@@ -222,7 +226,7 @@ mod tests {
         assert!(ubg.adjacencies.get(&head(4)).expect(".").eq(&HashSet::from([tail(1),head(3)])));
     }
 
-    fn carp_sanity_check(ubg : &UBG, contested : &HashSet<(u32,u32)>, uncontested : &HashSet<(u32,u32)>) {
+    fn carp_sanity_check(ubg : &UBG, contested : &HashSet<Adjacency>, uncontested : &HashSet<Adjacency>) {
         let mut all = HashSet::new();
         for (x,nghb) in ubg.adjacencies.iter() {
             for y in nghb {
@@ -232,7 +236,7 @@ mod tests {
         assert!(contested.is_subset(&all));
         assert!(uncontested.is_subset(&all));
         assert!(contested.is_disjoint(uncontested));
-        let union : HashSet<(u32,u32)> = contested.union(uncontested).cloned().collect();
+        let union : HashSet<Adjacency> = contested.union(uncontested).cloned().collect();
         assert_eq!(all,union);
         for (x,y) in contested {
             assert!(ubg.adjacencies.get(x).expect("!").len()>1 
@@ -270,10 +274,10 @@ mod tests {
 }
 
 
-fn remove_node_from_adj(adjacencies : &mut HashMap<u32,HashSet<u32>>, xtr : u32) {
+fn remove_node_from_adj(adjacencies : &mut HashMap<Extremity,HashSet<Extremity>>, xtr : Extremity) {
     let neighbors=adjacencies.get(&xtr).cloned().expect("aa");
     for x in neighbors.iter() {
-        let v: &mut HashSet<u32> =  adjacencies.get_mut(&x).expect("A");
+        let v: &mut HashSet<Extremity> =  adjacencies.get_mut(&x).expect("A");
         v.remove(&xtr);
     }
     adjacencies.remove(&xtr);
@@ -312,7 +316,7 @@ pub fn trim_graph(ubg : &mut UBG,threshold : usize) {
 #[derive(Copy, Clone, Eq, PartialEq)]
 struct State {
     cost: usize,
-    position: u32,
+    position: Extremity,
 }
 
 // The priority queue depends on `Ord`.
@@ -335,10 +339,10 @@ impl PartialOrd for State {
     }
 }
 
-pub fn adjacency_neighborhood(m : u32,max_depth : usize, ubg : &UBG) -> HashSet<(u32,u32)>{
+pub fn adjacency_neighborhood(m : Marker,max_depth : usize, ubg : &UBG) -> HashSet<Adjacency>{
     let mut visited = BinaryHeap::new();
     let init_dist = ubg.node_sizes.get(&m).unwrap_or(&0)/2;
-    let mut adjacencies = HashSet::new();
+    let mut adjacencies : HashSet<Adjacency> = HashSet::new();
     let mut min_dist = HashMap::new();
     if init_dist > max_depth {
         return  adjacencies;
@@ -371,7 +375,7 @@ pub fn adjacency_neighborhood(m : u32,max_depth : usize, ubg : &UBG) -> HashSet<
 }
 
 
-pub fn partial2gfa(ubg : &UBG, adjacencies : &HashSet<(u32,u32)>) {
+pub fn partial2gfa(ubg : &UBG, adjacencies : &HashSet<Adjacency>) {
     let nids = reverse_map(&ubg.node_ids);
     let mut nodes = HashMap::new();
     let mut linkstrs = Vec::new();
@@ -410,9 +414,9 @@ pub fn partial2gfa(ubg : &UBG, adjacencies : &HashSet<(u32,u32)>) {
     }
 }
 
-pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<(u32,u32)>) -> u32 {
+pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<Adjacency>) -> usize {
     let mut carp_measure = 0;
-    let mut degrees : HashMap<u32, u32> = HashMap::new();
+    let mut degrees : HashMap<Extremity, u32> = HashMap::new();
     for (x,y) in adjacencies {
         let xv= degrees.entry(*x).or_insert(0);
         *xv+=1;
@@ -427,7 +431,7 @@ pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<(u32,u32)>) -> u32 {
     carp_measure
 }
 
-fn check_add_tel(ubg : &mut UBG, n : u32) {
+fn check_add_tel(ubg : &mut UBG, n : Extremity) {
     match ubg.adjacencies.get(&n) {
         None => ubg.adjacencies.insert(n, HashSet::new()),
         Some(_) => None
@@ -456,7 +460,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
     eprintln!("Read gfa.");
     let mut node_sizes = HashMap::new();
     let mut adjacencies = HashMap::new(); 
-    let mut node_ids: HashMap<String, u32>   = HashMap::new();
+    let mut node_ids: HashMap<String, Marker>   = HashMap::new();
     let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
     let mut curr_id = 1;
     let mut i :u32 = 0;
@@ -530,7 +534,7 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
 }
 
 
-fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : u32) -> (u32,bool,u32) {
+fn parse_marker(node_ids: &mut HashMap<String, Marker>, markerstr: &str, curr_id : Marker) -> (Marker,bool,Marker) {
     let mut workslice = markerstr;
     let mut is_forward = true;
     let mut curr_id = curr_id;
@@ -554,7 +558,7 @@ fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : 
 }
 
 
-pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
+pub fn to_adjacency((ifa,ma):(bool,Marker),(ifb,mb):(bool,Marker)) -> Adjacency{
     eprintln!("ma {ma} mb {mb}");
     let xta = if ifa {
         head(ma)
@@ -574,8 +578,8 @@ pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
 //TODO Make constructor etc
 pub fn parse_unimog(path : &str) -> io::Result<UBG> {
     let node_sizes = HashMap::new();
-    let mut adjacencies :HashMap<u32, HashSet<u32>> = HashMap::new();
-    let mut node_ids: HashMap<String, u32>   = HashMap::new();
+    let mut adjacencies :HashMap<Extremity, HashSet<Extremity>> = HashMap::new();
+    let mut node_ids: HashMap<String, Marker>   = HashMap::new();
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut curr_id = 1;
@@ -635,7 +639,7 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
 
 
 
-fn get_or_set_node_id(node_ids: &mut HashMap<String, u32>, curr_id: u32, seg_name: String) -> (u32,u32){
+fn get_or_set_node_id(node_ids: &mut HashMap<String, Marker>, curr_id: Marker, seg_name: String) -> (Marker,Marker){
     let n_id = *node_ids.entry(seg_name).or_insert(curr_id);
     let new_id = if curr_id==n_id{
         curr_id+1
@@ -645,7 +649,7 @@ fn get_or_set_node_id(node_ids: &mut HashMap<String, u32>, curr_id: u32, seg_nam
     (new_id,n_id)
 }
 
-fn canonicize((a,b):(u32,u32)) -> (u32,u32) {
+fn canonicize((a,b):Adjacency) -> Adjacency {
     if a < b {
         (a,b)
     } else {
@@ -653,7 +657,7 @@ fn canonicize((a,b):(u32,u32)) -> (u32,u32) {
     }
 }
 
-pub fn calc_carp_measure(ubg : &UBG) -> (HashSet<(u32,u32)>,HashSet<(u32,u32)>){
+pub fn calc_carp_measure(ubg : &UBG) -> (HashSet<Adjacency>,HashSet<Adjacency>){
     let mut contested = HashSet::new();
     let mut uncontested = HashSet::new();
     for (xtr,neighb) in &ubg.adjacencies {

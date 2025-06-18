@@ -8,7 +8,7 @@ use scj_carp_rust::*;
 
 
 
-fn output_ancestral_adj(ubg : &UBG,uncontested: &HashSet<(u32,u32)>,outfile: &mut File) {
+fn output_ancestral_adj(ubg : &UBG,uncontested: &HashSet<Adjacency>,outfile: &mut File) {
     //println!("Writing ancestral adjacencies...");
     let backmap = reverse_map(&ubg.node_ids);
     for (x,y) in uncontested {
