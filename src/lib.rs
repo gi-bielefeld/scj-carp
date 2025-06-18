@@ -1,7 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use csv::ReaderBuilder;
+use std::cmp::Ordering;
 
 #[derive(Debug)]
 pub struct UBG {
@@ -10,12 +11,24 @@ pub struct UBG {
     pub node_ids : HashMap<String,u32>
 }
 
+
 pub fn head(n : u32) -> u32 {
     2*n+1
 }
 
 pub fn tail(n : u32) -> u32 {
     2*n
+}
+
+pub fn other(n : u32) -> u32{
+    if n == 0 {
+        return 0;
+    }
+    if is_tail(n) {
+        head(marker(n))
+    } else {
+        tail(marker(n))
+    }
 }
 
 pub fn is_tail(n:u32) -> bool{
@@ -85,14 +98,14 @@ mod tests {
             node_sizes : node_siz
 
         };
-        println!("{:?}",ubg.adjacencies);
+        eprintln!("{:?}",ubg.adjacencies);
         trim_graph(&mut ubg, 2);
         assert!(ubg.node_sizes.contains_key(&1));
         assert!(ubg.node_sizes.contains_key(&2));
         assert!(!ubg.node_sizes.contains_key(&3));
         assert!(!ubg.adjacencies.contains_key(&head(3)));
         assert!(!ubg.adjacencies.contains_key(&tail(3)));
-        println!("{:?}",ubg.adjacencies);
+        eprintln!("{:?}",ubg.adjacencies);
         assert!(ubg.adjacencies.get(&head(2)).expect("!").contains(&tail(1)));
         assert!(ubg.adjacencies.get(&tail(1)).expect("!").contains(&head(2)));
         let mut remaining = HashSet::new();
@@ -168,7 +181,7 @@ mod tests {
     fn test_read_gfa_fail() {
         for path in ["test01.ug","testfiles/test04.gfa","testfiles/test06.gfa","testfiles/test07.gfa"] {
             let x = parse_gfa(path);
-            println!("{:?}",x);
+            eprintln!("{:?}",x);
             assert!(x.is_err());
         } 
     }
@@ -176,11 +189,11 @@ mod tests {
     #[test]
     fn test_emoji() {
         let mut ubg = parse_gfa("testfiles/test03.gfa").expect("File should be readable");
-        println!("nodes {:?}",ubg.node_ids);
-        println!("sizes {:?}",ubg.node_sizes);
+        eprintln!("nodes {:?}",ubg.node_ids);
+        eprintln!("sizes {:?}",ubg.node_sizes);
         add_telomeres(&mut ubg);
         general_ubg_sanity_check(&ubg);
-        println!("{:?}",ubg.adjacencies);
+        eprintln!("{:?}",ubg.adjacencies);
         assert!(ubg.adjacencies.get(&tail(1)).expect(".").eq(&HashSet::from([tail(2)])));
         assert!(ubg.adjacencies.get(&tail(2)).expect(".").eq(&HashSet::from([tail(1)])));
         assert!(ubg.adjacencies.get(&0).expect(".").eq(&HashSet::from([head(1),head(2)])));
@@ -295,6 +308,125 @@ pub fn trim_graph(ubg : &mut UBG,threshold : usize) {
     }
 }
 
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct State {
+    cost: usize,
+    position: u32,
+}
+
+// The priority queue depends on `Ord`.
+// Explicitly implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Notice that we flip the ordering on costs.
+        // In case of a tie we compare positions - this step is necessary
+        // to make implementations of `PartialEq` and `Ord` consistent.
+        other.cost.cmp(&self.cost)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+pub fn adjacency_neighborhood(m : u32,max_depth : usize, ubg : &UBG) -> HashSet<(u32,u32)>{
+    let mut visited = BinaryHeap::new();
+    let init_dist = ubg.node_sizes.get(&m).unwrap_or(&0)/2;
+    let mut adjacencies = HashSet::new();
+    let mut min_dist = HashMap::new();
+    if init_dist > max_depth {
+        return  adjacencies;
+    }
+    visited.push(State {cost : init_dist,position : head(m)});
+    visited.push(State {cost : init_dist,position : tail(m)});
+    while let Some(State {cost, position}) = visited.pop(){
+        if let Some(neighbors) = ubg.adjacencies.get(&position) {
+            for neigbor in neighbors {
+                if *neigbor == 0 {
+                    //skip telomeres, they're not real connections
+                    continue;
+                }
+                let oend = other(*neigbor);
+                let adj = if position < *neigbor {
+                  (position,*neigbor)  
+                } else {
+                    (*neigbor,position)
+                };
+                adjacencies.insert(adj);
+                let ndist = cost + ubg.node_sizes.get(&marker(*neigbor)).unwrap_or(&1);
+                if ndist <= max_depth && *min_dist.get(&oend).unwrap_or(&(ndist+1)) > ndist {
+                    visited.push(State{cost: ndist,position: oend});
+                    min_dist.insert(oend, ndist);
+                }
+            }
+        }
+    }
+    adjacencies
+}
+
+
+pub fn partial2gfa(ubg : &UBG, adjacencies : &HashSet<(u32,u32)>) {
+    let nids = reverse_map(&ubg.node_ids);
+    let mut nodes = HashMap::new();
+    let mut linkstrs = Vec::new();
+    for (x,y) in adjacencies {
+        let m1n = marker(*x);
+        let m2n = marker(*y);
+        if let Some(m1) = nids.get(&m1n) {
+            if let Some(m2) = nids.get(&m2n) {
+                nodes.insert(m1n,m1);
+                nodes.insert(m2n,m2);
+                let orient1 = if is_tail(*x) {
+                    "-"
+                } else {
+                    "+"
+                };
+                let orient2 = if is_tail(*y) {
+                    "+"
+                } else {
+                    "-"
+                };
+
+                linkstrs.push(format!("L\t{m1}\t{orient1}\t{m2}\t{orient2}"));
+            }
+        }
+        
+    }
+    for (k,x) in nodes {
+        let mut x :String = format!("S\t{x}\t");
+        for _ in 1..*ubg.node_sizes.get(&k).unwrap_or(&1) {
+            x+="N";
+        }
+        println!("{}",x);
+    }
+    for lstr in linkstrs {
+        println!("{}",lstr)
+    }
+}
+
+pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<(u32,u32)>) -> u32 {
+    let mut carp_measure = 0;
+    let mut degrees : HashMap<u32, u32> = HashMap::new();
+    for (x,y) in adjacencies {
+        let xv= degrees.entry(*x).or_insert(0);
+        *xv+=1;
+        let yv = degrees.entry(*y).or_insert(0);
+        *yv+=1;
+    }
+    for (x,y) in adjacencies {
+        if *degrees.get(x).unwrap() > 1 || *degrees.get(y).unwrap() > 1 {
+            carp_measure+=1;
+        }
+    }
+    carp_measure
+}
+
 fn check_add_tel(ubg : &mut UBG, n : u32) {
     match ubg.adjacencies.get(&n) {
         None => ubg.adjacencies.insert(n, HashSet::new()),
@@ -313,9 +445,7 @@ fn check_add_tel(ubg : &mut UBG, n : u32) {
 }
 
 pub fn add_telomeres(ubg : &mut UBG) {
-    println!("{:?}",ubg.node_sizes);
     for (node,_) in ubg.node_sizes.clone().iter() {
-        println!("{}",node);
         check_add_tel(ubg, head(*node));
         check_add_tel(ubg, tail(*node));
 
@@ -323,7 +453,7 @@ pub fn add_telomeres(ubg : &mut UBG) {
 }
 
 pub fn parse_gfa(path: &str) -> io::Result<UBG>{
-    println!("Read gfa.");
+    eprintln!("Read gfa.");
     let mut node_sizes = HashMap::new();
     let mut adjacencies = HashMap::new(); 
     let mut node_ids: HashMap<String, u32>   = HashMap::new();
@@ -335,8 +465,8 @@ pub fn parse_gfa(path: &str) -> io::Result<UBG>{
         let x = res?;
         i+=1;
         if i%1000000==0 {
-            println!("Read {} lines.",i);
-            println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
+            eprintln!("Read {} lines.",i);
+            eprintln!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
         }
   
         let entrytype= match x.get(0) {
@@ -425,7 +555,7 @@ fn parse_marker(node_ids: &mut HashMap<String, u32>, markerstr: &str, curr_id : 
 
 
 pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
-    println!("ma {ma} mb {mb}");
+    eprintln!("ma {ma} mb {mb}");
     let xta = if ifa {
         head(ma)
     } else {
@@ -436,7 +566,7 @@ pub fn to_adjacency((ifa,ma):(bool,u32),(ifb,mb):(bool,u32)) -> (u32,u32){
     } else {
         head(mb)
     };
-    println!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
+    eprintln!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
     (xta,xtb)
 }
 
@@ -460,11 +590,11 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
         while let Some(j) =  line.find(" ") {
             let m = &line[0..j];
             
-            println!("{}",m);
+            eprintln!("{}",m);
             let is_forward;
             let marker;
             (curr_id,is_forward,marker) = parse_marker(&mut node_ids, m, curr_id);
-            println!("is_forward {}",is_forward);
+            eprintln!("is_forward {}",is_forward);
             if first.is_none() {
                 first=Some((is_forward,marker));
             }
@@ -502,6 +632,7 @@ pub fn parse_unimog(path : &str) -> io::Result<UBG> {
         node_ids
     })
 }
+
 
 
 fn get_or_set_node_id(node_ids: &mut HashMap<String, u32>, curr_id: u32, seg_name: String) -> (u32,u32){

@@ -47,6 +47,7 @@ fn main() {
                     .required(true))
         .arg(arg!(-a --"write-ancestor" <p> "Path to write ancestral adjacencies to."))
         .arg(arg!(-m --"write-measure" <p> "Path to write the carp measure to."))
+        //.arg(arg!(-r --"find-regions"))
         .get_matches();
     
     let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
