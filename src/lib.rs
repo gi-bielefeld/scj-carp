@@ -148,7 +148,7 @@ impl RearrangementGraph for UBG  {
         } else if entrytype == "L" {
             let (sega,segb) = match  (x.get(1),x.get(3)) {
                 (Some(a),Some(b)) => (a,b),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,format!("Malformed link: {:?} in line {}",x,i)))
             };
             let aid;
             let bid;
@@ -159,7 +159,7 @@ impl RearrangementGraph for UBG  {
                 (Some("+"),Some("-")) => (head(aid),head(bid)),
                 (Some("-"),Some("+")) => (tail(aid),tail(bid)),
                 (Some("-"),Some("-")) => (tail(aid),head(bid)),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,format!("Malformed link: {:?} in line {}",x,i)))
             };
             if !adjacencies.contains_key(&axtr) {
                 adjacencies.insert(axtr,HashSet::new());
@@ -173,7 +173,9 @@ impl RearrangementGraph for UBG  {
         }
 
     }
-    
+    println!("GFA file parsing done.");
+    println!("Read {} lines.",i);
+    println!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
     
     Ok(UBG {
         node_sizes,
