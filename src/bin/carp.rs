@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, Write};
 use clap::{arg, value_parser, ArgGroup, Command};
@@ -8,9 +8,8 @@ use scj_carp_rust::*;
 
 
 
-fn output_ancestral_adj(ubg : &UBG,uncontested: &HashSet<Adjacency>,outfile: &mut File) {
+fn output_ancestral_adj(mid2string : &HashMap<Marker,String>,uncontested: &HashSet<Adjacency>,outfile: &mut File) {
     //println!("Writing ancestral adjacencies...");
-    let backmap = reverse_map(&ubg.node_ids);
     for (x,y) in uncontested {
         let xt = match is_tail(*x) {
             true => "t",
@@ -23,8 +22,8 @@ fn output_ancestral_adj(ubg : &UBG,uncontested: &HashSet<Adjacency>,outfile: &mu
         if *x == 0 || *y==0 {
             continue;
         }
-        let xm = backmap.get(&marker(*x)).expect("Retranslating went wrong");
-        let ym = backmap.get(&marker(*y)).expect("Retranslating went wrong");
+        let xm = mid2string.get(&marker(*x)).expect("Retranslating went wrong");
+        let ym = mid2string.get(&marker(*y)).expect("Retranslating went wrong");
         outfile.write(format!("{xm} {xt}\t{ym} {yt}\n").as_bytes()).expect("Could not write ancestral file.");
         
     }
@@ -55,24 +54,24 @@ fn main() {
     println!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => parse_gfa(gfaf),
-        (_,Some(unimog)) =>  parse_unimog(&unimog),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     println!("Adding telomeres to complete graph.");
-    add_telomeres(&mut graph);
+    graph.fill_telomeres();
     println!("Trimming graph.");
-    trim_graph(&mut graph, thresh);
-    add_telomeres(&mut graph);
+    graph.trim(thresh);
+    graph.fill_telomeres();
     println!("Calculating carp measure.");
-    let (contested, uncontested) = calc_carp_measure(&graph);
+    let (contested, uncontested) = calc_carp_measure_naive(&graph);
     let m = contested.len();
     println!("Carp index: {}",m);
     if let Some(p)=  matches.get_one::<String>("write-measure") {
         measure_to_file(p, m);
     }
     if let Some(p)=  matches.get_one::<String>("write-ancestor") {
-        output_ancestral_adj(&graph, &uncontested,&mut File::create(p).expect("Could not create output file."));
+        output_ancestral_adj(&graph.marker_names(), &uncontested,&mut File::create(p).expect("Could not create output file."));
     }
 }

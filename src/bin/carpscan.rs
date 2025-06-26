@@ -4,19 +4,19 @@ use clap::{arg, value_parser, ArgGroup, Command};
 use scj_carp_rust::*;
 
 
-fn scan_graph(graph : &UBG,max_depth :usize) -> HashMap<Marker, usize>{
+fn scan_graph(graph : &impl RearrangementGraph,max_depth :usize) -> HashMap<Marker, usize>{
     eprintln!("Scanning graph...");
     let mut node_complexities = HashMap::new();
-    let tot_size = graph.node_ids.len();
+    let tot_size = graph.num_markers();
     let mut i = 1;
-    for (m,_) in graph.node_sizes.iter() {
-        if *m == 0 {
+    for m in graph.markers() {
+        if m == 0 {
             continue;
         }
         //eprintln!("Processing node {}",m);
-        let adjacencies = adjacency_neighborhood(*m,max_depth, graph);
+        let adjacencies = adjacency_neighborhood(m,max_depth, graph);
         let ci = carp_measure_from_adjacencies(&adjacencies);
-        node_complexities.insert(*m,ci);
+        node_complexities.insert(m,ci);
         if i%(tot_size/100) == 0 {
             let percentage = i*100/tot_size;
             eprintln!("Processed {i}/{tot_size} nodes ({percentage}%).");
@@ -77,19 +77,19 @@ fn main() {
     eprintln!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => parse_gfa(gfaf),
-        (_,Some(unimog)) =>  parse_unimog(&unimog),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     eprintln!("Adding telomeres to complete graph.");
-    add_telomeres(&mut graph);
+    graph.fill_telomeres();
     eprintln!("Trimming graph.");
-    trim_graph(&mut graph, thresh);
-    add_telomeres(&mut graph);
+    graph.trim(thresh);
+    graph.fill_telomeres();
     let node_c =  scan_graph(&graph, contextlen);
-    let inv_map = reverse_map(&graph.node_ids);
-    for x in top_percentile(&node_c, 0.99999) {
+    let inv_map = graph.marker_names();
+    for x in top_percentile(&node_c, 0.99) {
         println!("{}",inv_map.get(&x).unwrap());
     }
 }

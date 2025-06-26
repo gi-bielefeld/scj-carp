@@ -1,5 +1,5 @@
 use clap::{arg, value_parser, ArgGroup, Command};
-use scj_carp_rust::{parse_gfa,parse_unimog,add_telomeres,adjacency_neighborhood,partial2gfa,trim_graph};
+use scj_carp_rust::{adjacency_neighborhood,partial2gfa,MBG,RearrangementGraph};
 use std::io;
 
 fn main() {
@@ -16,23 +16,23 @@ fn main() {
         .get_matches();
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => parse_gfa(gfaf),
-        (_,Some(unimog)) =>  parse_unimog(&unimog),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
     let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
 
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     eprintln!("Adding telomeres to complete graph.");
-    add_telomeres(&mut graph);
+    graph.fill_telomeres();
     if thresh > 0 {
         eprintln!("Trimming graph.");
-        trim_graph(&mut graph, thresh);
+        graph.trim(thresh);
     }
-    add_telomeres(&mut graph);
+    graph.fill_telomeres();
     let start_node : &String = matches.get_one(&"start-node").expect("CLI Parsing gone wrong");
     let max_dist : usize = *matches.get_one(&"max-dist").expect("CLI Parsing gone wrong");
-    let marker = *graph.node_ids.get(start_node).unwrap();
+    let marker = graph.name_to_marker(&start_node).unwrap();
     let adjacencies = adjacency_neighborhood(marker, max_dist, &graph);
     partial2gfa(&graph, &adjacencies);
 }
