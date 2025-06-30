@@ -32,7 +32,7 @@ fn main() {
     graph.fill_telomeres();
     let start_node : &String = matches.get_one(&"start-node").expect("CLI Parsing gone wrong");
     let max_dist : usize = *matches.get_one(&"max-dist").expect("CLI Parsing gone wrong");
-    let marker = graph.name_to_marker(&start_node).unwrap();
+    let marker = graph.name_to_marker(&start_node).expect("Given node is not part of the (trimmed) graph. Make sure that this node id exists and try a lower size threshold.");
     let adjacencies = adjacency_neighborhood(marker, max_dist, &graph);
     partial2gfa(&graph, &adjacencies);
 }

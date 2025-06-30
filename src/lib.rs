@@ -1,10 +1,14 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::fmt::format;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use csv::ReaderBuilder;
 use std::cmp::Ordering;
 
 
+
+const ONE_MILLION :usize = 1000000;
+const LEN_PREFIX  : &str = "LN:i:";
 #[derive(Debug)]
 pub struct UBG {
     pub node_sizes : HashMap<Marker,usize>,
@@ -134,10 +138,16 @@ impl RearrangementGraph for UBG  {
                 None => return Err(io::Error::new(io::ErrorKind::Other,"Empty segment label")),
                 Some(y) => y.to_string()
             };
-            let seg_len = match seg_str {
+            let mut seg_len = match seg_str {
                 None => 0,
                 Some(y) => y.len()
             };
+            for entry in x.iter().skip(3) {
+                if entry.starts_with(&LEN_PREFIX) {
+                    let lenstr = &entry[LEN_PREFIX.len()..];
+                    seg_len = lenstr.parse().expect(&format!("Invalid length: {}",lenstr));
+                }
+            }
             let n_id;
             (curr_id,n_id) = get_or_set_node_id(&mut node_ids, curr_id, seg_name);
             if !node_sizes.contains_key(&n_id) {
@@ -364,7 +374,8 @@ impl RearrangementGraph for MBG {
     }
 
     fn num_markers(&self) -> usize {
-        self.node_ids.len()-self.masked_markers.len()
+        //+1 because of telomere node, which does not have an id, but occurs in masked
+        self.node_ids.len()-self.masked_markers.len()+1
     }
 
     fn num_extremities(&self) -> usize {
@@ -377,6 +388,7 @@ impl RearrangementGraph for MBG {
 
     fn trim(&mut self, min_size : usize) {
         let mut to_remove = Vec::new();
+        let nbefore = self.num_markers();
         for (m,size) in self.node_sizes.iter().enumerate() {
             if *size < min_size {
                 to_remove.push(m);
@@ -384,6 +396,9 @@ impl RearrangementGraph for MBG {
         }
         for m in to_remove {
             self.remove_marker(m);
+        }
+        if self.num_markers() < nbefore/10 {
+            eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
         }
     }
     
@@ -423,12 +438,13 @@ impl RearrangementGraph for MBG {
     let mut node_ids: HashMap<String, Marker>   = HashMap::new();
     let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
     let mut curr_id = 1;
-    let mut i :u32 = 0;
+    let mut i :usize = 0;
     let mut n_edges :usize = 0;
+    
     for res in rdr.records() {
         let x = res?;
         i+=1;
-        if i%1000000==0 {
+        if i%ONE_MILLION==0 {
             eprintln!("Read {} lines.",i);
             eprintln!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
         }
@@ -445,10 +461,16 @@ impl RearrangementGraph for MBG {
                 None => return Err(io::Error::new(io::ErrorKind::Other,"Empty segment label")),
                 Some(y) => y.to_string()
             };
-            let seg_len = match seg_str {
+            let mut seg_len = match seg_str {
                 None => 0,
                 Some(y) => y.len()
             };
+            for entry in x.iter().skip(3) {
+                if entry.starts_with(&LEN_PREFIX) {
+                    let lenstr = &entry[LEN_PREFIX.len()..];
+                    seg_len = lenstr.parse().expect(&format!("Invalid length: {}",lenstr));
+                }
+            }
             let n_id;
             (curr_id,n_id) = get_or_set_node_id(&mut node_ids, curr_id, seg_name);
             if n_id >= node_sizes.len() {
@@ -488,7 +510,7 @@ impl RearrangementGraph for MBG {
         }
 
     }
-    
+    eprintln!("{node_sizes:?}");
     
     Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
 }
@@ -568,7 +590,7 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
 }
 
 fn name_to_marker(&self,name : &str) -> Option<Marker> {
-    self.node_ids.get(name).copied()
+    self.node_ids.get(name).filter(|x| !self.masked_markers.contains(*x)).copied()
 }
 
 fn marker_names(&self) -> HashMap<Marker,String> {
@@ -1011,10 +1033,10 @@ pub fn partial2gfa(ubg : &impl RearrangementGraph, adjacencies : &HashSet<Adjace
         
     }
     for (k,x) in nodes {
-        let mut x :String = format!("S\t{x}\t");
-        for _ in 1..ubg.node_size(k).unwrap_or(1) {
-            x+="A";
-        }
+        let mut x :String = format!("S\t{x}\t*");
+        if let Some(ns) = ubg.node_size(k) {
+            x+=&format!("\tLN:i:{ns}");
+        } 
         println!("{}",x);
     }
     for lstr in linkstrs {
