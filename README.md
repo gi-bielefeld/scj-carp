@@ -1,5 +1,5 @@
 # SCJ-CARP
-
+![CARP LOGO](carptrace_plain.svg)
 ## How to build
 
 `cargo build --release`
