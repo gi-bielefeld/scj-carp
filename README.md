@@ -1,93 +1,70 @@
-# CARP
+# SCJ-CARP
+
+## How to build
+
+`cargo build --release`
+
+The resulting binaries (`carp`,`carpscan`,`extract`) are then found in `./target/release/`.
+
+## How to run
 
 
+All binaries need to be run with either `--gfa <your-file> ` to read `<your-file>` in [gfa format](https://gfa-spec.github.io/GFA-spec/GFA1.html) or with `--unimog <your-file> ` to read `<your-file>` in [unimog format](https://bibiserv.cebitec.uni-bielefeld.de/dcj).
 
-## Getting started
+Currently we do not support the inferrence of telomeres from paths in gfa files. This may lead to small differences in the CARP measure.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Optionally the binaries support the following parameters:
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+| Parameter | Behavior |
+| ------ | ------ |
+| `-s`/`--size-thresh <st>`| Filter out all nodes smaller than `<st>`. Note: Since unimog files do not support node lengths, this will filter all nodes in a graph from a unimog file |
+| `-t`/`--num-threads <t>`       | Use `<t>` threads for the main computation of the program. This currently does not apply to file reading or graph timming.       |
+| `-h`/`--help`       | Displays a help text for the given program |
 
-## Add your files
+### `carp`
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+This program calculates the SCJ CARP measure for the given pangenome and outputs it to the command line. 
 
-```
-cd existing_repo
-git remote add origin https://gitlab.ub.uni-bielefeld.de/gi/carp.git
-git branch -M main
-git push -uf origin main
-```
+`-m`/`--write-measure <p>` writes the CARP measure to file `<p>`.
 
-## Integrate with your tools
+`-a`/`--write-ancestor <p>`  writes one potential set of  ancestral adjacencies to file `<p>`.
 
-- [ ] [Set up project integrations](https://gitlab.ub.uni-bielefeld.de/gi/carp/-/settings/integrations)
+<details><summary>Example</summary>
 
-## Collaborate with your team
+`./target/release/carp --gfa test.gfa -m test_measure.txt -a test_ancestor.txt `
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+</details>
 
-## Test and Deploy
+### `carpscan`
 
-Use the built-in continuous integration in GitLab.
+This program calculates the SCJ CARP measure for the environment of each node in the (trimmed) graph.
+By default it outputs the 1% nodes with the most complex environment as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+`-c`, `--context-len <c>` Defines the context length `<c>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
 
-***
+`--colored-gfa <f>`         Outputs an annotated gfa to `<f>` visualizing complexities. Can be opened in bandage.
 
-# Editing this README
+`--output-histogram <f>`    Outputs counts for a histogram of complexities. Use `plotscripts/plot_hist.py` to visualize it.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+`--lower-percentile <lo>`   Output node ids that lie between the lower and higher percentile to standard output. Default 0.99.
 
-## Suggestions for a good README
+`--higher-percentile <hi>`  Output node ids that lie between the lower and higher percentile to standard output. Default 1.00.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+<details><summary>Example</summary>
 
-## Name
-Choose a self-explaining name for your project.
+`./target/release/carpscan --gfa test.gfa  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+View the histogram with: ` python3 plotscripts/plot_hist.py test.hist  --num-buckets 1000`
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Open `test_colored.gfa` in bandage for a visualization of node complexities.
+</details>
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### `extract`
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+This program allows to ectract the surrounding graph of a node to gfa. This gfa file is output to stdout and needs to be piped into a file.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+`-n, --start-node <n>`    Id `<n>` of the start node.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+`-d, --max-dist <d>`    Defines the context length `<d>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.

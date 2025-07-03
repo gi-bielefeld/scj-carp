@@ -36,7 +36,11 @@ rule all_default_zombi_trees:
         expand('zombi/z_default_sample{s}/T/ExtantTree.nwk',s=range(1,N_SAMPLES+1))
 
 
-
+rule cargo_build:
+    output:
+        './target/release/scj-carp-rust'
+    shell:
+        'cargo build -r'
 
 
 rule aggregate_treescale_results_hor:
@@ -73,32 +77,33 @@ rule prec_recall:
     output:
         'pr/z_{params}/pr.txt'
     shell:
-        'python3 precrecall.py --ground {input.gt} --result {input.ca} > {output}'
+        'python3 scripts/precrecall.py --ground {input.gt} --result {input.ca} > {output}'
 
 rule run_carp:
     input:
-        pgnm='pangenome/z_{params}/unimog.txt'
+        pgnm='pangenome/z_{params}/unimog.txt',
+        binary = 'target/release/scj-carp-rust'
     output:
         ci='carp/measures/z_{params}/measure.txt',
         ca='carp/adjacencies/z_{params}/adj.txt'
     log:
         'carp/logs/z_{params}/log.txt'
     shell:
-        'python3 scj_carp.py {input} --write-measure {output.ci} --write-carp-adjacencies {output.ca} > {log}'
+        '{input.binary} --unimog {input.pgnm} --write-measure {output.ci} --write-ancestor {output.ca} > {log}'
 
 rule setup_transfer_zombi:
     output:
         tp='zombi/z_transfer{t}_sample{s}/tree_params.tsv',
         gp='zombi/z_transfer{t}_sample{s}/genome_params.tsv'
     shell:
-        'cp %s {output.tp};python3 custom_param_files.py {wildcards.t} > {output.gp}'%(ZOMBI_TREE_PARAMS)
+        'cp %s {output.tp};python3 scripts/custom_param_files.py {wildcards.t} > {output.gp}'%(ZOMBI_TREE_PARAMS)
 
 rule setup_treescale_zombi:
     output:
         tp='zombi/z_treescale{scl}_sample{s}/tree_params.tsv',
         gp='zombi/z_treescale{scl}_sample{s}/genome_params.tsv'
     shell:
-        'python3 treescale.py {output.tp} {output.gp} {wildcards.scl}'
+        'python3 scripts/treescale.py {output.tp} {output.gp} {wildcards.scl}'
 
 rule setup_default_zombi:
     output:
@@ -138,7 +143,7 @@ rule zombi_to_pangenome:
     output:
         'pangenome/z_{params}/unimog.txt'
     shell:
-        'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ > {output}'
+        'python3 scripts/zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ > {output}'
 
 
 rule root_adjacencies:
@@ -147,7 +152,7 @@ rule root_adjacencies:
     output:
         'pangenome/z_{params}/adj_root.txt'
     shell:
-        'python3 genome2adj.py {input} > {output}'
+        'python3 scripts/genome2adj.py {input} > {output}'
 
 
 rule zombi_to_root:
@@ -157,4 +162,4 @@ rule zombi_to_root:
     output:
         'pangenome/z_{params}/root.txt'
     shell:
-        'python3 zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ --onlyRoot > {output}'
+        'python3 scripts/zombi2unimog.py {input.tree} zombi/z_{wildcards.params}/G/Genomes/ --onlyRoot > {output}'
