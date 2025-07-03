@@ -3,7 +3,58 @@ use std::fs::File;
 use std::io::{self, Write};
 use clap::{arg, value_parser, ArgGroup, Command};
 use scj_carp_rust::*;
+use std::thread;
 
+
+fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &[usize],thread_num : usize) -> HashMap<Marker,usize> {
+    let mut node_complexities = HashMap::new();
+    let tot_size = markers.len();
+    let about_ten_percent = (markers.len()/10 +1).max(10000);
+    eprintln!("Thread {thread_num}: {about_ten_percent}");
+    let mut i = 0;
+    for m in markers {
+        if *m == 0 {
+            continue;
+        }
+        //eprintln!("Processing node {}",m);
+        let adjacencies = adjacency_neighborhood(*m,max_depth, graph);
+        let ci = carp_measure_from_adjacencies(&adjacencies);
+        node_complexities.insert(*m,ci);
+        
+        if i%(about_ten_percent) == 0 {
+            let percentage = i*100/tot_size;
+            eprintln!("Thread {thread_num} processed {i}/{tot_size} nodes ({percentage}%).");
+        }
+        i+=1;
+    }
+    node_complexities
+}
+
+fn scan_graph_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_threads : usize) -> HashMap<Marker, usize> {
+    let markerlist : Vec<Marker> = graph.markers().collect();
+    let mut node_complexities = HashMap::new();
+    
+    let totlen = markerlist.len();
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        let slice_size = markerlist.len()/n_threads +1;
+        for i in 0..n_threads {
+            let lb = slice_size*i;
+            let rb = (slice_size*(i+1)).min(markerlist.len());
+            eprintln!("Spawning thread {i} processing markers with index {lb} to {rb} (total {totlen})");
+            let mlist = &markerlist[lb..rb];
+            let x =  scope.spawn(move || scan_partial(graph, max_depth, mlist, i));
+            handles.push(x);
+        }
+        for x in handles {
+            let hm = x.join().unwrap();
+            node_complexities.extend(hm);
+        }
+        
+    });
+    
+    node_complexities
+}
 
 fn scan_graph(graph : &impl RearrangementGraph,max_depth :usize) -> HashMap<Marker, usize>{
     eprintln!("Scanning graph...");
@@ -14,14 +65,15 @@ fn scan_graph(graph : &impl RearrangementGraph,max_depth :usize) -> HashMap<Mark
     if about_one_percent == 0 {
             about_one_percent=1;
     }
-    for m in graph.markers() {
-        if m == 0 {
+    let markerlist : Vec<Marker> = graph.markers().collect();
+    for m in &markerlist {
+        if *m == 0 {
             continue;
         }
         //eprintln!("Processing node {}",m);
-        let adjacencies = adjacency_neighborhood(m,max_depth, graph);
+        let adjacencies = adjacency_neighborhood(*m,max_depth, graph);
         let ci = carp_measure_from_adjacencies(&adjacencies);
-        node_complexities.insert(m,ci);
+        node_complexities.insert(*m,ci);
         
         if i%(about_one_percent) == 0 {
             let percentage = i*100/tot_size;
@@ -31,6 +83,8 @@ fn scan_graph(graph : &impl RearrangementGraph,max_depth :usize) -> HashMap<Mark
     }
     node_complexities
 }
+
+
 
 fn histogram(node_complexities : &HashMap<Marker,usize>) -> HashMap<usize,usize> {
     let mut hist : HashMap<usize,usize> = HashMap::new();
@@ -131,7 +185,7 @@ fn write_hist(hist:&HashMap<usize,usize>,path : &str) -> std::io::Result<()> {
 
 fn main() {
     //TODO: make struct
-    let matches = Command::new("scj-carp")
+    let cmd = Command::new("scj-carp")
         .arg(arg!(-s --"size-thresh" <st> "Size threshold for nodes (nodes of lower sizes are discarded)")
             .value_parser(value_parser!(usize))
             .default_value("0"))
@@ -144,11 +198,13 @@ fn main() {
         .arg(arg!(--"output-histogram" <f> "Output a histogram of complexities."))
         .arg(arg!(--"lower-percentile" <lo> "Output nodes that lie between the lower and higher percentile to standard output. Default 0.99").value_parser(value_parser!(f64)).default_value("0.99"))
         .arg(arg!(--"higher-percentile" <hi> "Output nodes that lie between the lower and higher percentile to standard output. Default 1.00").value_parser(value_parser!(f64)).default_value("1.00"))
-        .get_matches();
+        .arg(arg!(-t --"num-threads" <t> "Number of threads to use in the scanning phase. Default: 1.").value_parser(value_parser!(usize)).default_value("1"));
     
+    let matches = cmd.get_matches();
     let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
     let contextlen = *matches.get_one(&"context-len").expect("CLI Parsing gone wrong");
-
+    let n_threads = *matches.get_one(&"num-threads").expect("CLI parsing gone wrong");
+    eprintln!("{}",CARP_LOGO);
     eprintln!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
@@ -162,7 +218,7 @@ fn main() {
     eprintln!("Trimming graph.");
     graph.trim(thresh);
     graph.fill_telomeres();
-    let node_c  =  scan_graph(&graph, contextlen);
+    let node_c  =  scan_graph_multithread(&graph, contextlen,n_threads);
     let mn = *node_c.values().min().unwrap();
     let mut mx = * node_c.values().max().unwrap();
     if mx == 0 {

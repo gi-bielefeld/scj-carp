@@ -8,7 +8,7 @@ use scj_carp_rust::*;
 
 
 
-fn output_ancestral_adj(mid2string : &HashMap<Marker,String>,uncontested: &HashSet<Adjacency>,outfile: &mut File) {
+fn output_ancestral_adj(mid2string : &HashMap<Marker,String>,uncontested: &Vec<Adjacency>,outfile: &mut File) {
     //println!("Writing ancestral adjacencies...");
     for (x,y) in uncontested {
         let xt = match is_tail(*x) {
@@ -46,11 +46,12 @@ fn main() {
                     .required(true))
         .arg(arg!(-a --"write-ancestor" <p> "Path to write ancestral adjacencies to."))
         .arg(arg!(-m --"write-measure" <p> "Path to write the carp measure to."))
-        //.arg(arg!(-r --"find-regions"))
+        .arg(arg!(-t --"num-threads" <t> "Number of threads to use to calculate SCJ CARP index.").value_parser(value_parser!(usize)).default_value("1"))
         .get_matches();
     
     let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
-
+    let threads = *matches.get_one(&"num-threads").expect("CLI Parsing gone wrong");
+    eprintln!("{}",CARP_LOGO);
     println!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
@@ -65,7 +66,7 @@ fn main() {
     graph.trim(thresh);
     graph.fill_telomeres();
     println!("Calculating carp measure.");
-    let (contested, uncontested) = calc_carp_measure_naive(&graph);
+    let (contested, uncontested) = calc_carp_measure_multithread(&graph,threads);
     let m = contested.len();
     println!("Carp index: {}",m);
     if let Some(p)=  matches.get_one::<String>("write-measure") {

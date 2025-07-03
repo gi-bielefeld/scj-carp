@@ -1,14 +1,44 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::fmt::format;
 use std::fs::File;
+use std::hash::Hash;
 use std::io::{self, BufRead, BufReader};
 use csv::ReaderBuilder;
 use std::cmp::Ordering;
+use std::thread;
 
 
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
+
+pub const CARP_LOGO : &str = 
+"'kl               You're running SCJ CARP
+XMM.                        Version 0.0.1
+.MMW.                                    
+ MMd                                     
+ XM.         Feel free to report bugs at:
+ lK      github.com/gi-bielefeld/scj-carp
+ .Mx                                     
+ .MMO.                                   
+  MMMXc.                                 
+  KMMMMM0l.                              
+  .WMMMMMMM0l.                           
+   :MMMMMMMMMM0c.                        
+    ;WMMMMMMMMMMMXd;                     
+     'NMMMMMMMMMMMMMWOl.                 
+      .XMMMMMMMMMMMMMMMMXc               
+       .xMMMMMMMMMMMMMMMMMXc             
+         ,NMMMMMMMMMMMMMKkxOXO:          
+          'NMMMMMMMMMMX,....'NMK'        
+        .KMMMMMMMMMMMMN:...,dMMMW'       
+        :MMMMMMMMMMMMMMMNXNMMMMMMW.      
+         ,okOOo'.;kWMMMMMMMMMMMMMMN.     
+                .ckNWNMMMMMMMMMMMMk,.    
+             .dOxc,.  .:dxkO0XNNo.       
+            ''.                ;         
+";
+pub const CARP_VERSION : &str = "0.0.1";
+
 #[derive(Debug)]
 pub struct UBG {
     pub node_sizes : HashMap<Marker,usize>,
@@ -18,7 +48,9 @@ pub struct UBG {
 
 
 pub trait RearrangementGraph
-where Self : Sized
+where Self : Sized,
+Self: Send,
+Self: Sync
 {
     fn degree(&self,n:Extremity) -> Option<usize>;
     fn adj_neighbors(&self,n:Extremity) -> Option<impl Iterator<Item=Extremity>>;
@@ -329,7 +361,7 @@ impl MBG {
 
 impl RearrangementGraph for MBG {
     fn degree(&self,n:Extremity) -> Option<usize> {
-        if self.masked_markers.contains(&marker(n)) {
+        if self.masked_markers.contains(&marker(n)) && n!=0 {
             return None;
         }
         self.adjacencies.get(n).map(|x| x.len())
@@ -510,7 +542,7 @@ impl RearrangementGraph for MBG {
         }
 
     }
-    eprintln!("{node_sizes:?}");
+    //eprintln!("{node_sizes:?}");
     
     Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
 }
@@ -1141,6 +1173,70 @@ fn canonicize((a,b):Adjacency) -> Adjacency {
     }
 }
 
+#[inline(always)]
+fn naive_hash(x : usize) -> usize{
+    (7727*x+7001)%7919
+}
+#[inline(always)]
+fn is_my_adjacency((x,y) : Adjacency) -> bool {
+    let hx = naive_hash(x);
+    let hy = naive_hash(y);
+    hx < hy || (hx == hy && x <= y)
+}
+
+pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Extremity],threadnum: usize) -> (Vec<Adjacency>,Vec<Adjacency>) {
+    let mut contested = Vec::new();
+    let mut uncontested = Vec::new();
+    for x in extremities {
+        let degx = graph.degree(*x).unwrap();
+        if let Some(neighbors) = graph.adj_neighbors(*x) {
+            for y in  neighbors{
+                let degy = graph.degree(y).unwrap();
+                if !is_my_adjacency((*x,y)) {
+                    continue;
+                }
+                if degx > 1 || degy > 1 {
+                    contested.push(canonicize((*x,y)));
+                } else {
+                    uncontested.push(canonicize((*x,y)));
+                }
+            }
+        }
+        
+    }
+
+    (contested,uncontested)
+}
+
+pub fn calc_carp_measure_multithread(graph : &impl RearrangementGraph, n_threads : usize) -> (Vec<Adjacency>,Vec<Adjacency>) {
+    let mut contested = Vec::new();
+    let mut uncontested = Vec::new();
+    let extremities : Vec<Extremity> = graph.extremities().collect();
+    let tot_len = extremities.len();
+    let slice_len = (tot_len/n_threads)+1;
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for i in 0..n_threads {
+            let lb = i*slice_len;
+            let rb = ((i+1)*slice_len).min(tot_len);
+            let elist = &extremities[lb..rb];
+            let handle = scope.spawn(move || {
+                calc_partial_measure(graph, elist, i)
+            }
+            );
+            handles.push(handle);
+        }
+        for handle in handles {
+            let (c,uc) =  handle.join().unwrap();
+            contested.extend(c);
+            uncontested.extend(uc);
+        }
+     });
+    (contested,uncontested)
+}
+
+
+
 pub fn calc_carp_measure_naive(graph : &impl RearrangementGraph) -> (HashSet<Adjacency>,HashSet<Adjacency>){
     let mut contested = HashSet::new();
     let mut uncontested = HashSet::new();
@@ -1166,6 +1262,8 @@ pub fn calc_carp_measure_naive(graph : &impl RearrangementGraph) -> (HashSet<Adj
     }
     (contested,uncontested)
 }
+
+
 
 
 pub fn reverse_map<K,V>(m : &HashMap<K,V>) -> HashMap<V,K>
