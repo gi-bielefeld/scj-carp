@@ -11,7 +11,7 @@ use std::thread;
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
 
-pub const CARP_LOGO : &str = 
+pub const CARP_LOGO_O : &str = 
 "'kl               You're running SCJ CARP
 XMM.                        Version 0.0.1
 .MMW.                                    
@@ -37,6 +37,37 @@ XMM.                        Version 0.0.1
              .dOxc,.  .:dxkO0XNNo.       
             ''.                ;         
 ";
+
+pub const CARP_LOGO : &str = 
+"   oo.              You're running SCJ CARP
+ o00O                         Version 0.0.1
+  O00O                                     
+  O00.                                     
+  O0O          Feel free to report bugs at:
+  o0o      github.com/gi-bielefeld/scj-carp
+   0o                                      
+   O0O                                     
+   O00O.                                   
+   o0000Oo                                 
+   .0000000Oo.                             
+    o000000000Oo.                          
+     O00000000000Oo.                       
+      O0000000000000Oo.                    
+       o0000000000000000Oo.                
+        o000000000000000000Oo.             
+         .O0000000000000000000o.           
+           o00000000000000000000Oo.        
+            .O000000000000Oo....o00o.      
+           .OO000000000000o......O000.     
+          .0000000000000000OoooO000000.    
+          .O000000OO0000000000000000000.   
+            ..ooo.   .O00000000000000000.  
+                  .oO00OOO000000000000O... 
+               .oOOo..    ..ooooOOO0o.     
+              ..                   .       
+";
+
+
 pub const CARP_VERSION : &str = "0.0.1";
 
 #[derive(Debug)]
@@ -472,7 +503,7 @@ impl RearrangementGraph for MBG {
     let mut curr_id = 1;
     let mut i :usize = 0;
     let mut n_edges :usize = 0;
-    
+    let mut telomeres : Vec<(String,bool)> = Vec::new();
     for res in rdr.records() {
         let x = res?;
         i+=1;
@@ -539,8 +570,57 @@ impl RearrangementGraph for MBG {
             adjacencies.get_mut(axtr).unwrap().push(bxtr);
             adjacencies.get_mut(bxtr).unwrap().push(axtr);
             n_edges+=1;
+        } else if entrytype == "P" {
+            let pname = x.get(1).expect("Path does not have a name identifier.");
+            let mut path = x.get(2).expect(&format!("Path '{pname}' missing mandatory gfa field 3.")).split(|x : char| {x==',' || x==';'});
+            let fst = path.nth(0);
+            let lst = path.last();
+            let parse_pend = |x : &str,is_telomere_end : bool| {
+                let x = x.strip_suffix("\n").unwrap_or(x);
+                assert!(x.ends_with("+") || x.ends_with("-"));
+                let mut xp = x.to_owned();
+                xp.pop();
+                let xtr_is_tail = is_telomere_end == x.ends_with("+");
+                (xp,xtr_is_tail)};
+            match (fst,lst) {
+                (Some(f),Some(l)) => {
+                  telomeres.push(parse_pend(f,false));
+                },
+                (_,_) => continue
+            }
+        } else if entrytype == "W" {
+            let wlk = x.get(6).expect("Walk line without walk");
+            let pat = |x : char| {x=='>' || x=='<'};
+            let end = wlk.find(pat);
+            let strt = wlk.rfind(pat);
+            let mut wlki = wlk[1..].split(pat);
+            let fst = wlki.nth(0);
+            let lst = wlki.last();
+            match (fst,lst) {
+                (Some(f),Some(l)) => {
+                  let e_is_tail = wlk.as_bytes()[end.unwrap()] as char == '<';
+                  let s_is_tail = wlk.as_bytes()[strt.unwrap()] as char == '>';
+                  telomeres.push((f.to_owned(),s_is_tail));
+                  telomeres.push((l.to_owned(),e_is_tail));
+                },
+                (_,_) => continue
+            }
         }
 
+    }
+    eprintln!("Filling telomeres observed in paths");
+    for (mrk,xtr_is_tail) in telomeres {
+        let m = *node_ids.get(&mrk).expect(&format!("Segment {mrk} occurs in a path, but not as a segment entry."));
+        let xtr = if xtr_is_tail {
+            tail(m)
+        } else  {
+            head(m)
+        };
+        if adjacencies.len() <= xtr {
+                Self::fill_up_vec(&mut adjacencies, xtr);
+        }
+        adjacencies.get_mut(xtr).unwrap().push(0);
+        adjacencies.get_mut(0).unwrap().push(xtr);
     }
     //eprintln!("{node_sizes:?}");
     
@@ -909,6 +989,18 @@ mod tests {
         assert!(ubg.adj_neighbors(head(4)).unwrap().collect::<HashSet<_>>().eq(&HashSet::from([tail(1),head(3)])));
     }
 
+    fn carp_multithread_sanity_check(ubg : &impl RearrangementGraph, contested : &HashSet<Adjacency>, uncontested : &HashSet<Adjacency>) {
+        for i in 1..8 {
+            let (c, uc) = calc_carp_measure_multithread(ubg, i);
+            assert_eq!(c.len(),contested.len());
+            assert_eq!(uc.len(),uncontested.len());
+            let cs : HashSet<Adjacency> = c.iter().copied().collect();
+            let ucs : HashSet<Adjacency> = uc.iter().copied().collect();
+            assert_eq!(cs,contested.clone());
+            assert_eq!(ucs,uncontested.clone());
+        }
+    }
+
     fn carp_sanity_check(ubg : &impl RearrangementGraph, contested : &HashSet<Adjacency>, uncontested : &HashSet<Adjacency>) {
         let mut all = HashSet::new();
         for (x,y) in ubg.iter_adjacencies() {
@@ -931,6 +1023,8 @@ mod tests {
             assert!(ubg.adj_neighbors(*x).unwrap().collect::<HashSet<_>>().contains(y)
                 && ubg.adj_neighbors(*y).unwrap().collect::<HashSet<_>>().contains(x))
         }
+        carp_multithread_sanity_check(ubg, contested, uncontested);
+
     }
 
     #[test]
@@ -1217,7 +1311,7 @@ pub fn calc_carp_measure_multithread(graph : &impl RearrangementGraph, n_threads
     thread::scope(|scope| {
         let mut handles = Vec::new();
         for i in 0..n_threads {
-            let lb = i*slice_len;
+            let lb = (i*slice_len).min(tot_len);
             let rb = ((i+1)*slice_len).min(tot_len);
             let elist = &extremities[lb..rb];
             let handle = scope.spawn(move || {

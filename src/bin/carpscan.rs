@@ -6,11 +6,12 @@ use scj_carp_rust::*;
 use std::thread;
 
 
+
 fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &[usize],thread_num : usize) -> HashMap<Marker,usize> {
     let mut node_complexities = HashMap::new();
     let tot_size = markers.len();
-    let about_ten_percent = (markers.len()/10 +1).max(10000);
-    eprintln!("Thread {thread_num}: {about_ten_percent}");
+    let about_ten_percent = (markers.len()/100 +1);//.max(10000);
+    //eprintln!("Thread {thread_num}: {about_ten_percent}");
     let mut i = 0;
     for m in markers {
         if *m == 0 {
@@ -20,15 +21,43 @@ fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &
         let adjacencies = adjacency_neighborhood(*m,max_depth, graph);
         let ci = carp_measure_from_adjacencies(&adjacencies);
         node_complexities.insert(*m,ci);
-        
+        i+=1;
         if i%(about_ten_percent) == 0 {
             let percentage = i*100/tot_size;
             eprintln!("Thread {thread_num} processed {i}/{tot_size} nodes ({percentage}%).");
         }
-        i+=1;
+        
     }
     node_complexities
 }
+
+
+
+fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : usize, end : usize,thread_num : usize) -> HashMap<Marker,usize> {
+    let mut node_complexities = HashMap::new();
+    let tot_size = end - start;
+    let about_five_percent = (tot_size/20 +1);
+    //eprintln!("Thread {thread_num}: {about_ten_percent}");
+    let mut i = 0;
+    for m in start..end {
+        if m == 0 || graph.adj_neighbors(head(m)).is_none(){
+            continue;
+        }
+        //eprintln!("Processing node {}",m);
+        let adjacencies = adjacency_neighborhood(m,max_depth, graph);
+        let ci = carp_measure_from_adjacencies(&adjacencies);
+        node_complexities.insert(m,ci);
+        i+=1;
+        if i%(about_five_percent) == 0 {
+            let percentage = i*100/tot_size;
+            eprintln!("Thread {thread_num} processed {i}/{tot_size} nodes ({percentage}%).");
+        }
+        
+    }
+    node_complexities
+}
+
+
 
 fn scan_graph_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_threads : usize) -> HashMap<Marker, usize> {
     let markerlist : Vec<Marker> = graph.markers().collect();
@@ -55,6 +84,34 @@ fn scan_graph_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_t
     
     node_complexities
 }
+
+
+
+fn scan_graph_enum_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_threads : usize) -> HashMap<Marker, usize> {
+    let mmax : Marker = graph.markers().max().unwrap_or(0)+1;
+    let mut node_complexities = HashMap::new();
+    
+    let totlen = mmax - 1;
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        let slice_size = totlen/n_threads +1;
+        for i in 0..n_threads {
+            let lb = slice_size*i;
+            let rb = (slice_size*(i+1)).min(totlen);
+            eprintln!("Spawning thread {i} processing markers with index {lb} to {rb} (total {totlen})");
+            let x =  scope.spawn(move || scan_enumerate(graph,max_depth,lb,rb,i));
+            handles.push(x);
+        }
+        for x in handles {
+            let hm = x.join().unwrap();
+            node_complexities.extend(hm);
+        }
+        
+    });
+    
+    node_complexities
+}
+
 
 fn scan_graph(graph : &impl RearrangementGraph,max_depth :usize) -> HashMap<Marker, usize>{
     eprintln!("Scanning graph...");
@@ -218,7 +275,7 @@ fn main() {
     eprintln!("Trimming graph.");
     graph.trim(thresh);
     graph.fill_telomeres();
-    let node_c  =  scan_graph_multithread(&graph, contextlen,n_threads);
+    let node_c  =  scan_graph_enum_multithread(&graph, contextlen,n_threads);
     let mn = *node_c.values().min().unwrap();
     let mut mx = * node_c.values().max().unwrap();
     if mx == 0 {

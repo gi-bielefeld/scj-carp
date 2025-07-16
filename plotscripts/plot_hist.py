@@ -1,11 +1,14 @@
 import matplotlib.pyplot as plt
 from argparse import ArgumentParser
+from matplotlib import colormaps
+import numpy as np
 from math import floor
 
 parser = ArgumentParser()
 parser.add_argument("tsv")
 parser.add_argument("--num-buckets",type=int,default=100)
 parser.add_argument("--color-ns",nargs='*',type=int)
+parser.add_argument("--xlabel",default="CARP measure in vicinity of node")
 args = parser.parse_args()
 
 
@@ -37,16 +40,25 @@ for e,w in zip(elems,weights):
 
 
 
-plt.bar(bucket_centers,buckets,width=(mx-mn)/args.num_buckets)
 
 if args.color_ns:
-    for (lo,hi) in zip(args.color_ns,args.color_ns[1::]):
-        plt.bar(bucket_centers[lo:hi],buckets[lo:hi],width=(mx-mn)/args.num_buckets)
+    n_colors = len(args.color_ns)
+else:
+    n_colors = 1
+cmap = plt.get_cmap('inferno')
+colors = [cmap(i) for i in np.linspace(0, 1, n_colors)]
+
+
+plt.bar(bucket_centers,buckets,width=(mx-mn)/args.num_buckets,color=colors[0])
+
+if args.color_ns:
+    for lo,hi,cl in zip(args.color_ns,args.color_ns[1::],colors[1::]):
+        plt.bar(bucket_centers[lo:hi],buckets[lo:hi],width=(mx-mn)/args.num_buckets,color=cl)
 
 curr_t = list(range(0,12000,500))
 curr_l = curr_t
-plt.xticks(curr_t+[50,140,800,10000],labels=curr_l+["A","B","C","D"])
-plt.xlabel("CARP measure in Vicinity of 1000 BP")
+#plt.xticks(curr_t+[50,140,800,10000],labels=curr_l+["A","B","C","D"])
+plt.xlabel(args.xlabel)
 plt.ylabel("Number of Nodes")
 #plt.yscale("log")
 plt.show()
