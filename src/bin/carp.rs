@@ -63,7 +63,7 @@ fn main() {
     println!("Adding telomeres to complete graph.");
     graph.fill_telomeres();
     println!("Trimming graph.");
-    graph.trim(thresh);
+    graph.trim_multithread(thresh,threads);
     graph.fill_telomeres();
     println!("Calculating carp measure.");
     let (contested, uncontested) = calc_carp_measure_multithread(&graph,threads);

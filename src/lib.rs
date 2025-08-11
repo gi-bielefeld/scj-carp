@@ -1,11 +1,9 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
-use std::hash::Hash;
 use std::io::{self, BufRead, BufReader};
 use csv::ReaderBuilder;
 use std::cmp::Ordering;
 use std::thread;
-
 
 
 const ONE_MILLION :usize = 1000000;
@@ -70,7 +68,7 @@ pub const CARP_LOGO : &str =
 
 pub const CARP_VERSION : &str = "0.0.1";
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct UBG {
     pub node_sizes : HashMap<Marker,usize>,
     pub adjacencies : HashMap<Extremity,HashSet<Extremity>>,
@@ -87,6 +85,7 @@ Self: Sync
     fn adj_neighbors(&self,n:Extremity) -> Option<impl Iterator<Item=Extremity>>;
     fn node_size(&self,n:Marker) -> Option<usize>;
     fn trim(&mut self, min_size : usize);
+    fn trim_multithread(&mut self, min_size : usize,n_threads : usize);
     fn markers(&self) -> impl Iterator<Item=Marker>;
     fn iter_adjacencies(&self) -> impl Iterator<Item=Adjacency>;
     fn extremities(&self) -> impl Iterator<Item=Extremity>;
@@ -117,30 +116,66 @@ impl RearrangementGraph for UBG  {
     }
 
     fn trim(&mut self, threshold : usize) {
-        let mut to_remove = Vec::new();
-    for (node,sz) in self.node_sizes.iter() {
-        if *sz < threshold {
-            //println!("Removing {} , i.e. {} (hd) {} (tl)",node,head(*node),tail(*node));
-            let hd = head(*node);
-            let tl = tail(*node);
-            let nh = self.adjacencies.get(&hd).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
-            let nt = self.adjacencies.get(&tl).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
-            //add adjacencies between the neighboring markers
-            for x in nh.iter() {
-                for y in nt.iter() {
-                    self.adjacencies.get_mut(&x).expect("!").insert(*y);
-                    self.adjacencies.get_mut(&y).expect("!").insert(*x);
+        let mut to_remove = HashSet::new();
+        for (node,sz) in self.node_sizes.iter() {
+            if *sz < threshold {
+                //println!("Removing {} , i.e. {} (hd) {} (tl)",node,head(*node),tail(*node));
+                let hd = head(*node);
+                let tl = tail(*node);
+                let nh = self.adjacencies.get(&hd).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
+                let nt = self.adjacencies.get(&tl).expect("Assertion violated: Marker extremity not in adjacencies.").clone();
+                //add adjacencies between the neighboring markers
+                for x in nh.iter() {
+                    for y in nt.iter() {
+                        self.adjacencies.get_mut(&x).expect("!").insert(*y);
+                        self.adjacencies.get_mut(&y).expect("!").insert(*x);
+                    }
                 }
+                if nh.contains(&hd) {
+                    for x in nt.iter() {
+                        for y in nt.iter() {
+                            self.adjacencies.get_mut(&x).expect("!").insert(*y);
+                            self.adjacencies.get_mut(&y).expect("!").insert(*x);
+                        }
+                    }
+                }
+                if nt.contains(&tl) {
+                    for x in nh.iter() {
+                        for y in nh.iter() {
+                            self.adjacencies.get_mut(&x).expect("!").insert(*y);
+                            self.adjacencies.get_mut(&y).expect("!").insert(*x);
+                        }
+                    }
+                }
+                remove_node_from_adj(&mut self.adjacencies, hd);
+                remove_node_from_adj(&mut self.adjacencies, tl);
+                to_remove.insert(*node);   
             }
-            remove_node_from_adj(&mut self.adjacencies, hd);
-            remove_node_from_adj(&mut self.adjacencies, tl);
-            to_remove.push(*node);   
         }
-    }
 
-    for node in to_remove {
-        self.node_sizes.remove(&node);
+        for node in &to_remove {
+            self.node_sizes.remove(node);
+        }
+        let mut xd = Vec::new();
+        for (x,y) in &self.node_ids{
+            if to_remove.contains(y) {
+                xd.push(x.clone());
+            }
+        }
+
+        for x in xd {
+            self.node_ids.remove(&x);
+        }
+
     }
+    
+    fn trim_multithread(&mut self, min_size : usize,n_threads : usize) {
+        if n_threads <= 1 {
+            self.trim(min_size);
+        } else {
+             panic!("Not implemented!");
+        }
+       
     }
 
 
@@ -338,7 +373,7 @@ fn marker_names(&self) -> HashMap<Marker,String> {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct MBG {
     node_sizes : Vec<usize>,
     adjacencies : Vec<Vec<Extremity>>,
@@ -353,28 +388,56 @@ impl MBG {
         if self.masked_markers.contains(&m) {
             return
         }
-        let tailnb  = self.adjacencies.get(tail(m)).map(|x: &Vec<usize>|x.clone()).unwrap();
-        let headnb  = self.adjacencies.get(head(m)).map(|x|x.clone()).unwrap();
+        let tailnb : HashSet<Extremity> = self.adjacencies.get(tail(m)).unwrap().iter().copied().collect();
+        let headnb : HashSet<Extremity>  = self.adjacencies.get(head(m)).unwrap().iter().copied().collect();
         self.adjacencies[head(m)]= Vec::new();
         self.adjacencies[tail(m)] = Vec::new();
         //It's a bit annoying going with the HashMap intermediary
         for x in &tailnb {
+            if *x==head(m) || *x==tail(m) {
+                continue;
+            }
             let mut xneighbors : HashSet<Extremity> = self.adjacencies.get(*x).unwrap().iter().copied().collect();
             xneighbors.remove(&tail(m));
             for y in &headnb {
-                xneighbors.insert(*y);
+                if *y != head(m) && *y != tail(m) {
+                    xneighbors.insert(*y);
+                }
+            }
+            if headnb.contains(&head(m)) {
+                for y in &tailnb {
+                    if *y != head(m) && *y != tail(m) {
+                        xneighbors.insert(*y);
+                }
+            } 
             }
             self.adjacencies[*x] = xneighbors.iter().copied().collect();
         }
 
         for x in &headnb {
+            if *x==head(m) || *x==tail(m) {
+                continue;
+            }
             let mut xneighbors : HashSet<Extremity> = self.adjacencies.get(*x).unwrap().iter().copied().collect();
             xneighbors.remove(&head(m));
             for y in &tailnb {
-                xneighbors.insert(*y);
+                if *y != head(m) && *y != tail(m) {
+                    xneighbors.insert(*y);
+                }
+            }
+            if tailnb.contains(&tail(m)) {
+                for y in &headnb {
+                    if *y != head(m) && *y != tail(m) {
+                        xneighbors.insert(*y);
+                }
+            } 
             }
             self.adjacencies[*x]=xneighbors.iter().copied().collect();
         }
+
+        
+
+
         self.masked_markers.insert(m); 
     }
 
@@ -385,10 +448,75 @@ impl MBG {
             adj.push(T::default());
         }
     }
+    
+    
+    fn find_solid_neighbors(&self, start : Extremity, size_threshold : usize) -> Vec<Extremity> {
+        let mut stack = Vec::new();
+        let mut visited = HashSet::new();
+        let mut solid_neighbors = HashSet::new();
+        stack.push(start);
+        while stack.len() > 0 {
+            let x = stack.pop().unwrap();
+            visited.insert(x);
+            for y in self.adj_neighbors(x).unwrap() {
+                let z = other(y);
+
+                    if self.node_size(marker(y)).unwrap_or(0) >= size_threshold || z==0 {
+                        solid_neighbors.insert(y);
+                    } else if !visited.contains(&z) {
+                        //eprintln!("Skipping over marker {}, size {:?}",marker(y),self.node_size(marker(y)));
+                        stack.push(z);
+                    }
+                
+            }
+        }
+        solid_neighbors.iter().copied().collect()
+    }
+
+    
 
 
 
 }
+
+
+fn has_deleted_neighbor(graph : &MBG, extremity : Extremity, size_threshold : usize) -> bool {
+    for x in graph.adj_neighbors(extremity).unwrap() {
+        if graph.node_size(marker(x)).unwrap_or(0) < size_threshold && x != 0 {
+            return true;
+        }
+    }
+    false
+}
+
+fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshold : usize) -> (HashSet<Marker>,Vec<(Extremity,Vec<Extremity>)>) {
+        let mut masked = HashSet::new();
+        let mut adjacencies = Vec::new();
+        let nnodes = to -from;
+        //eprintln!("Size thresh {size_threshold}");
+        for i in from..to {
+            let m = marker(i);
+            if i == 1 {
+                continue;
+            }
+            if graph.masked_markers.contains(&m) {
+                continue;
+            }
+            if graph.node_size(m).unwrap_or(0) < size_threshold && m != 0 {
+                masked.insert(m);
+                //eprintln!("Deleting marker {m}...");
+            } else if has_deleted_neighbor(graph, i, size_threshold) {
+                adjacencies.push((i,graph.find_solid_neighbors(i, size_threshold)));
+            }
+            if (i - from)%ONE_MILLION == 0 && i > from {
+                let proc_nodes = i-from;
+                let percentage = proc_nodes as f64 / nnodes as f64 * 100.0;
+                eprintln!("Processed {proc_nodes} extremities in range [{from},{to}[ ({percentage:.02}%)");
+            }
+        }
+        //eprintln!("{from} {to}: {adjacencies:?}");
+        (masked,adjacencies)
+    }
 
 impl RearrangementGraph for MBG {
     fn degree(&self,n:Extremity) -> Option<usize> {
@@ -457,6 +585,7 @@ impl RearrangementGraph for MBG {
                 to_remove.push(m);
             }
         }
+        eprintln!("Identified {} markers for removal.",to_remove.len());
         for m in to_remove {
             self.remove_marker(m);
         }
@@ -464,6 +593,7 @@ impl RearrangementGraph for MBG {
             eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
         }
     }
+
     
 
     fn from_hash_maps(sizes : HashMap<Marker,usize>, adj :HashMap<Extremity,HashSet<Extremity>> ,  nids : HashMap<String,Marker>) -> Self {
@@ -608,7 +738,7 @@ impl RearrangementGraph for MBG {
         }
 
     }
-    eprintln!("Filling telomeres observed in paths");
+    eprintln!("Filling in {} telomeres observed in paths",telomeres.len());
     for (mrk,xtr_is_tail) in telomeres {
         let m = *node_ids.get(&mrk).expect(&format!("Segment {mrk} occurs in a path, but not as a segment entry."));
         let xtr = if xtr_is_tail {
@@ -708,7 +838,51 @@ fn name_to_marker(&self,name : &str) -> Option<Marker> {
 fn marker_names(&self) -> HashMap<Marker,String> {
     reverse_map(&self.node_ids)
 }
+fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
 
+    let adj = &self.adjacencies.len();
+
+    if n_threads <= 1 {
+        self.trim(min_size);
+        return;
+    }
+    let max_xt = self.adjacencies.len();
+    let mut results: Vec<(HashSet<usize>, Vec<(usize,Vec<usize>)>)> = Vec::new();
+    let nbefore = self.num_markers();
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        let slice_size = max_xt/n_threads +1;
+        for i in 0..n_threads {
+            let g = &self;
+            let lb = (slice_size*i).min(max_xt);
+            let rb = (slice_size*(i+1)).min(max_xt);
+            eprintln!("Spawning thread {i} processing extremities with index {lb} to {rb} (total {max_xt})");
+            let x =  scope.spawn(move || __trim_vertices(g,lb, rb, min_size));
+            handles.push(x);
+        }
+        for x in handles {
+            results.push(x.join().unwrap());
+        }
+        
+    });
+    eprintln!("Joining results.");
+    for (masked, adj) in results {
+        self.masked_markers.extend(&masked);
+        for m in &masked {
+            self.adjacencies[head(*m)] = Vec::new();
+            self.adjacencies[tail(*m)] = Vec::new();
+        }
+        for (i, adjs) in adj {
+            self.adjacencies[i]=adjs
+        }
+    }
+    if self.num_markers() < nbefore/10 {
+            eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
+    }
+    let adj = &self.adjacencies.len();
+}
+    
+    
     
 }
 
@@ -792,11 +966,13 @@ mod tests {
 
     #[test]
     fn test_trim_graph() {
-        mtest_trim_graph::<UBG>();
-        mtest_trim_graph::<MBG>();
+        mtest_trim_graph::<UBG>(1);
+        for i in 1..11 {
+            mtest_trim_graph::<MBG>(i);
+        }
     }
 
-    fn mtest_trim_graph<T>()
+    fn mtest_trim_graph<T>(n_threads : usize)
     where T : RearrangementGraph
      {
         let mut adj = HashMap :: new();
@@ -821,7 +997,13 @@ mod tests {
         adj.get_mut(&tail(3)).expect("!").insert(head(2));
         let mut ubg = T::from_hash_maps(node_siz, adj, node_ids);
 
-        ubg.trim(2);
+        if n_threads == 1 {
+            ubg.trim(2);
+        } else {
+            ubg.trim_multithread(2, n_threads);
+        }
+        
+        general_ubg_sanity_check(&ubg);
         assert!(ubg.node_size(1).is_some());
         assert!(ubg.node_size(2).is_some());
         assert!(ubg.node_size(3).is_none());
@@ -848,13 +1030,26 @@ mod tests {
     fn general_ubg_sanity_check(ubg: &impl RearrangementGraph) {
         //forbidden telomere thing
         assert!(ubg.degree(1).is_none());
+        let mp = ubg.marker_names();
         for m in ubg.markers() {
+            //println!("Testing marker: {m}");
+            if let Some(name) = mp.get(&m) {
+                //println!("Aka {name}")
+            }
             assert!(ubg.degree(tail(m)).is_some());
             assert!(ubg.degree(head(m)).is_some());
         }
+        let mset : HashSet<Marker> = ubg.markers().collect();
         for x in ubg.extremities() {
+            //eprintln!("Testing extremity of {}",marker(x));
+            if !mset.contains(&marker(x)) && x!=0 {
+                panic!("Extremity {x} exists, but its marker does not!");
+            }
             if let Some(neighbors) = ubg.adj_neighbors(x) {
                 for y in neighbors {
+                    if !mset.contains(&marker(y)) && y!=0 {
+                        panic!("Extremity {y} exists, but its marker does not!");
+                    }
                 let mut has_x = false;
                 for z in ubg.adj_neighbors(y).unwrap() {
                     has_x = has_x || (z==x);
@@ -1050,6 +1245,55 @@ mod tests {
         }
         for (a,b) in r.iter() {
             assert!(m.get(b).expect(".")==a)
+        }
+    }
+
+
+    fn equivalence_check(g1 : &impl RearrangementGraph, g2 : &impl RearrangementGraph) {
+        let a1 : HashSet<Adjacency> = g1.iter_adjacencies().map(|x| canonicize(x)).collect();
+        let a2 : HashSet<Adjacency> = g2.iter_adjacencies().map(|x| canonicize(x)).collect();
+        let mut mp = g1.marker_names();
+        let mp2 = g2.marker_names();
+        mp.extend(mp2);
+        let a_u1 : HashSet<Adjacency> = a1.difference(&a2).copied().collect();
+        eprintln!("{a_u1:?}");
+        let a_u2 : HashSet<Adjacency> = a2.difference(&a1).copied().collect();
+        eprintln!("{a_u2:?}");
+        let a_u : HashSet<String> = a1.symmetric_difference(&a2).copied().map(|a| pretty_adjacency(&mp, a)).collect();
+        eprintln!("{a_u:?}");
+        assert!(a_u.len()==0);
+        let m1 : HashSet<Marker> = g1.markers().collect();
+        let m2 : HashSet<Marker> = g2.markers().collect();
+        assert_eq!(m1,m2);
+        let ms1 : HashSet<(Marker,usize)> = m1.iter().map(|x| (*x,g1.node_size(*x).unwrap())).collect();
+        let ms2 : HashSet<(Marker,usize)> = m2.iter().map(|x| (*x,g2.node_size(*x).unwrap())).collect();
+        assert_eq!(ms1,ms2);
+    }
+
+    #[test]
+    fn test_trim_ypestis() {
+        let mut mbg = MBG::from_gfa("testfiles/test_ypestis.gfa").expect("File should be readable");
+        let mut ubg = UBG::from_gfa("testfiles/test_ypestis.gfa").expect("File should be readable");
+        mbg.fill_telomeres();
+        ubg.fill_telomeres();
+        equivalence_check(&mbg, &ubg);
+        eprintln!("Pre-Testing MBG");
+        general_ubg_sanity_check(&mbg);
+        eprintln!("Pre-Testing UBG");
+        general_ubg_sanity_check(&ubg);
+        for i in 32..35 {
+            let mut ubg = ubg. clone();
+            ubg.trim(i);
+            for nt in 1..9 {
+                let mut mbg = mbg. clone();
+                mbg.trim_multithread(i,nt);
+                eprintln!("Testing MBG t:{i}");
+                general_ubg_sanity_check(&mbg);
+                eprintln!("Testing UBG t:{i}");
+                general_ubg_sanity_check(&ubg);
+                equivalence_check(&mbg, &ubg);
+            }
+            
         }
     }
 }
@@ -1370,4 +1614,22 @@ V : Eq+std::hash::Hash+Clone
         reversed.insert(b.clone(),a.clone());
     }
     reversed
+}
+
+
+fn pretty_extremity(m : &HashMap<Marker,String>,x : Extremity) -> String {
+    if !m.contains_key(&marker(x)) {
+        panic!("Extremity {x} not found!");
+    }
+    let s = m.get(&marker(x)).unwrap().clone();
+    let ht = if is_tail(x) {
+        "t"
+    } else {
+        "h"
+    };
+    s+"_"+ht
+}
+
+fn pretty_adjacency(m : &HashMap<Marker,String>,(x,y) : Adjacency) -> String{
+    pretty_extremity(m, x)+"-"+&pretty_extremity(m, y)
 }
