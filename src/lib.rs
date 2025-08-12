@@ -1537,8 +1537,6 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
     for x in extremities {
         let degx = graph.degree(*x).unwrap();
         if let Some(neighbors) = graph.adj_neighbors(*x) {
-            let xmnbnbm : Vec::<Extremity> = graph.adj_neighbors(*x).unwrap().collect();
-            eprintln!("{:?}",xmnbnbm);
             for y in  neighbors{
                 let degy = graph.degree(y).unwrap();
                 if !is_my_adjacency((*x,y)) {
