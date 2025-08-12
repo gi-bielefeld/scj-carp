@@ -322,7 +322,7 @@ fn from_unimog(path : &str) -> io::Result<UBG> {
             let is_forward;
             let marker;
             (curr_id,is_forward,marker) = parse_marker(&mut node_ids, m, curr_id);
-            eprintln!("is_forward {}",is_forward);
+            //eprintln!("is_forward {}",is_forward);
             if first.is_none() {
                 first=Some((is_forward,marker));
             }
@@ -791,11 +791,11 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
         while let Some(j) =  line.find(" ") {
             let m = &line[0..j];
             
-            eprintln!("{}",m);
+            //eprintln!("{}",m);
             let is_forward;
             let marker;
             (curr_id,is_forward,marker) = parse_marker(&mut node_ids, m, curr_id);
-            eprintln!("is_forward {}",is_forward);
+            //eprintln!("is_forward {}",is_forward);
             if first.is_none() {
                 first=Some((is_forward,marker));
             }
@@ -1484,7 +1484,7 @@ fn parse_marker(node_ids: &mut HashMap<String, Marker>, markerstr: &str, curr_id
 
 
 pub fn to_adjacency((ifa,ma):(bool,Marker),(ifb,mb):(bool,Marker)) -> Adjacency{
-    eprintln!("ma {ma} mb {mb}");
+    //eprintln!("ma {ma} mb {mb}");
     let xta = if ifa {
         head(ma)
     } else {
@@ -1495,7 +1495,7 @@ pub fn to_adjacency((ifa,ma):(bool,Marker),(ifb,mb):(bool,Marker)) -> Adjacency{
     } else {
         head(mb)
     };
-    eprintln!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
+    //eprintln!("Adj {} -> {}",hdtl_fmt(xta),hdtl_fmt(xtb));
     (xta,xtb)
 }
 
