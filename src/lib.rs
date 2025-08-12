@@ -1,9 +1,10 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
+use std::time::Duration;
 use csv::ReaderBuilder;
 use std::cmp::Ordering;
-use std::thread;
+use std::thread::{self, sleep};
 
 
 const ONE_MILLION :usize = 1000000;
@@ -499,13 +500,15 @@ fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshol
             if i == 1 {
                 continue;
             }
-            if graph.masked_markers.contains(&m) {
+            if graph.masked_markers.contains(&m) && i != 0 {
                 continue;
             }
             if graph.node_size(m).unwrap_or(0) < size_threshold && m != 0 {
                 masked.insert(m);
                 //eprintln!("Deleting marker {m}...");
             } else if has_deleted_neighbor(graph, i, size_threshold) {
+                let nbb = graph.find_solid_neighbors(i, size_threshold);
+                eprintln!("Solid neighbors of {i}: {nbb:?}");
                 adjacencies.push((i,graph.find_solid_neighbors(i, size_threshold)));
             }
             if (i - from)%ONE_MILLION == 0 && i > from {
@@ -566,7 +569,7 @@ impl RearrangementGraph for MBG {
 
     fn num_markers(&self) -> usize {
         //+1 because of telomere node, which does not have an id, but occurs in masked
-        self.node_ids.len()-self.masked_markers.len()+1
+        self.node_ids.len()+1-self.masked_markers.len()
     }
 
     fn num_extremities(&self) -> usize {
@@ -1296,6 +1299,14 @@ mod tests {
             
         }
     }
+
+    #[test]
+    fn test_multithread_trimming_empty() {
+        let mut mbg = MBG::from_gfa("testfiles/test_16s.gfa").expect("File should be readable");
+        mbg.fill_telomeres();
+        mbg.trim_multithread(ONE_MILLION,2);
+        general_ubg_sanity_check(&mbg);
+    }
 }
 
 
@@ -1528,6 +1539,8 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
     for x in extremities {
         let degx = graph.degree(*x).unwrap();
         if let Some(neighbors) = graph.adj_neighbors(*x) {
+            let xmnbnbm : Vec::<Extremity> = graph.adj_neighbors(*x).unwrap().collect();
+            eprintln!("{:?}",xmnbnbm);
             for y in  neighbors{
                 let degy = graph.degree(y).unwrap();
                 if !is_my_adjacency((*x,y)) {
@@ -1542,7 +1555,6 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
         }
         
     }
-
     (contested,uncontested)
 }
 
@@ -1564,8 +1576,11 @@ pub fn calc_carp_measure_multithread(graph : &impl RearrangementGraph, n_threads
             );
             handles.push(handle);
         }
+        let mut i=0;
         for handle in handles {
+            eprintln!("Joining {i}.");
             let (c,uc) =  handle.join().unwrap();
+            i+=1;
             contested.extend(c);
             uncontested.extend(uc);
         }
