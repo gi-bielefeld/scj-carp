@@ -29,8 +29,9 @@ fn output_ancestral_adj(mid2string : &HashMap<Marker,String>,uncontested: &Vec<A
     }
 }
 
-fn measure_to_file(p : &str, m : usize) {
+fn measure_to_file(p : &str, m : usize, nmarkers : usize) {
     let mut fl = File::create(p).expect("Could not create measure file");
+    fl.write_all(format!("Number of markers: {}\n",nmarkers).as_bytes()).expect("Could not write to measure file");
     fl.write_all(format!("Carp index: {}\n",m).as_bytes()).expect("Could not write to measure file");
 }
 
@@ -69,8 +70,9 @@ fn main() {
     let (contested, uncontested) = calc_carp_measure_multithread(&graph,threads);
     let m = contested.len();
     println!("Carp index: {}",m);
+    print!("On {} markers",graph.num_markers());
     if let Some(p)=  matches.get_one::<String>("write-measure") {
-        measure_to_file(p, m);
+        measure_to_file(p, m,graph.num_markers());
     }
     if let Some(p)=  matches.get_one::<String>("write-ancestor") {
         output_ancestral_adj(&graph.marker_names(), &uncontested,&mut File::create(p).expect("Could not create output file."));
