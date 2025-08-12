@@ -507,8 +507,6 @@ fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshol
                 masked.insert(m);
                 //eprintln!("Deleting marker {m}...");
             } else if has_deleted_neighbor(graph, i, size_threshold) {
-                let nbb = graph.find_solid_neighbors(i, size_threshold);
-                eprintln!("Solid neighbors of {i}: {nbb:?}");
                 adjacencies.push((i,graph.find_solid_neighbors(i, size_threshold)));
             }
             if (i - from)%ONE_MILLION == 0 && i > from {
