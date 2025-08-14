@@ -2,10 +2,10 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::time::Duration;
-use csv::ReaderBuilder;
+use csv::{ReaderBuilder,Reader};
 use std::cmp::Ordering;
 use std::thread::{self, sleep};
-
+use flate2::read::GzDecoder;
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
@@ -474,7 +474,140 @@ impl MBG {
         solid_neighbors.iter().copied().collect()
     }
 
+    fn gfa_from_any_reader<R>(rdr : &mut Reader<R>) -> Result<MBG, io::Error>
+    where 
+        R : std::io::Read
+    {
+        eprintln!("Read gfa.");
+        let mut node_sizes = Vec::new();
+        let mut adjacencies : Vec<Vec<Extremity>> = Vec::new(); 
+        let mut node_ids: HashMap<String, Marker>   = HashMap::new();
+        let mut curr_id = 1;
+        let mut i :usize = 0;
+        let mut n_edges :usize = 0;
+        let mut telomeres : Vec<(String,bool)> = Vec::new();
+        for res in rdr.records() {
+            let x = res?;
+            i+=1;
+            if i%ONE_MILLION==0 {
+                eprintln!("Read {} lines.",i);
+                eprintln!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
+            }
     
+            let entrytype= match x.get(0) {
+                None => continue,
+                Some(y) => y
+            };
+            
+            if entrytype=="S" {
+                let seg_name = x.get(1);
+                let seg_str = x.get(2);
+                let seg_name= match seg_name {
+                    None => return Err(io::Error::new(io::ErrorKind::Other,"Empty segment label")),
+                    Some(y) => y.to_string()
+                };
+                let mut seg_len = match seg_str {
+                    None => 0,
+                    Some(y) => y.len()
+                };
+                for entry in x.iter().skip(3) {
+                    if entry.starts_with(&LEN_PREFIX) {
+                        let lenstr = &entry[LEN_PREFIX.len()..];
+                        seg_len = lenstr.parse().expect(&format!("Invalid length: {}",lenstr));
+                    }
+                }
+                let n_id;
+                (curr_id,n_id) = get_or_set_node_id(&mut node_ids, curr_id, seg_name);
+                if n_id >= node_sizes.len() {
+                    Self::fill_up_vec(&mut node_sizes, n_id);
+                }
+                node_sizes[n_id] = seg_len;
+                
+                
+                
+            } else if entrytype == "L" {
+                let (sega,segb) = match  (x.get(1),x.get(3)) {
+                    (Some(a),Some(b)) => (a,b),
+                    (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                };
+                let aid;
+                let bid;
+                (curr_id,aid) = get_or_set_node_id(&mut node_ids, curr_id, sega.to_string());
+                (curr_id,bid) = get_or_set_node_id(&mut node_ids, curr_id, segb.to_string());
+                let (axtr,bxtr)= match (x.get(2),x.get(4)) {
+                    (Some("+"),Some("+")) => (head(aid),tail(bid)),
+                    (Some("+"),Some("-")) => (head(aid),head(bid)),
+                    (Some("-"),Some("+")) => (tail(aid),tail(bid)),
+                    (Some("-"),Some("-")) => (tail(aid),head(bid)),
+                    (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
+                };
+                if adjacencies.len() <= axtr {
+                    Self::fill_up_vec(&mut adjacencies, axtr);
+                }
+                if adjacencies.len() <= bxtr {
+                    Self::fill_up_vec(&mut adjacencies, bxtr);
+                }
+                //adjacencies.get_mut(&axtr).expect("Horror").insert(bxtr);
+                //adjacencies.get_mut(&bxtr).expect("Horror").insert(axtr);
+                adjacencies.get_mut(axtr).unwrap().push(bxtr);
+                adjacencies.get_mut(bxtr).unwrap().push(axtr);
+                n_edges+=1;
+            } else if entrytype == "P" {
+                let pname = x.get(1).expect("Path does not have a name identifier.");
+                let mut path = x.get(2).expect(&format!("Path '{pname}' missing mandatory gfa field 3.")).split(|x : char| {x==',' || x==';'});
+                let fst = path.nth(0);
+                let lst = path.last();
+                let parse_pend = |x : &str,is_telomere_end : bool| {
+                    let x = x.strip_suffix("\n").unwrap_or(x);
+                    assert!(x.ends_with("+") || x.ends_with("-"));
+                    let mut xp = x.to_owned();
+                    xp.pop();
+                    let xtr_is_tail = is_telomere_end == x.ends_with("+");
+                    (xp,xtr_is_tail)};
+                match (fst,lst) {
+                    (Some(f),Some(l)) => {
+                    telomeres.push(parse_pend(f,false));
+                    },
+                    (_,_) => continue
+                }
+            } else if entrytype == "W" {
+                let wlk = x.get(6).expect("Walk line without walk");
+                let pat = |x : char| {x=='>' || x=='<'};
+                let end = wlk.find(pat);
+                let strt = wlk.rfind(pat);
+                let mut wlki = wlk[1..].split(pat);
+                let fst = wlki.nth(0);
+                let lst = wlki.last();
+                match (fst,lst) {
+                    (Some(f),Some(l)) => {
+                    let e_is_tail = wlk.as_bytes()[end.unwrap()] as char == '<';
+                    let s_is_tail = wlk.as_bytes()[strt.unwrap()] as char == '>';
+                    telomeres.push((f.to_owned(),s_is_tail));
+                    telomeres.push((l.to_owned(),e_is_tail));
+                    },
+                    (_,_) => continue
+                }
+            }
+
+        }
+        eprintln!("Filling in {} telomeres observed in paths",telomeres.len());
+        for (mrk,xtr_is_tail) in telomeres {
+            let m = *node_ids.get(&mrk).expect(&format!("Segment {mrk} occurs in a path, but not as a segment entry."));
+            let xtr = if xtr_is_tail {
+                tail(m)
+            } else  {
+                head(m)
+            };
+            if adjacencies.len() <= xtr {
+                    Self::fill_up_vec(&mut adjacencies, xtr);
+            }
+            adjacencies.get_mut(xtr).unwrap().push(0);
+            adjacencies.get_mut(0).unwrap().push(xtr);
+        }
+        //eprintln!("{node_sizes:?}");
+        
+        Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
+    }
 
 
 
@@ -626,136 +759,17 @@ impl RearrangementGraph for MBG {
 
 
     fn from_gfa(path: &str) -> io::Result<Self>{
-    eprintln!("Read gfa.");
-    let mut node_sizes = Vec::new();
-    let mut adjacencies : Vec<Vec<Extremity>> = Vec::new(); 
-    let mut node_ids: HashMap<String, Marker>   = HashMap::new();
-    let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
-    let mut curr_id = 1;
-    let mut i :usize = 0;
-    let mut n_edges :usize = 0;
-    let mut telomeres : Vec<(String,bool)> = Vec::new();
-    for res in rdr.records() {
-        let x = res?;
-        i+=1;
-        if i%ONE_MILLION==0 {
-            eprintln!("Read {} lines.",i);
-            eprintln!("{} nodes and {} edges in graph.",node_sizes.len(),n_edges);
-        }
-  
-        let entrytype= match x.get(0) {
-            None => continue,
-            Some(y) => y
-        };
-        
-        if entrytype=="S" {
-            let seg_name = x.get(1);
-            let seg_str = x.get(2);
-            let seg_name= match seg_name {
-                None => return Err(io::Error::new(io::ErrorKind::Other,"Empty segment label")),
-                Some(y) => y.to_string()
-            };
-            let mut seg_len = match seg_str {
-                None => 0,
-                Some(y) => y.len()
-            };
-            for entry in x.iter().skip(3) {
-                if entry.starts_with(&LEN_PREFIX) {
-                    let lenstr = &entry[LEN_PREFIX.len()..];
-                    seg_len = lenstr.parse().expect(&format!("Invalid length: {}",lenstr));
-                }
-            }
-            let n_id;
-            (curr_id,n_id) = get_or_set_node_id(&mut node_ids, curr_id, seg_name);
-            if n_id >= node_sizes.len() {
-                Self::fill_up_vec(&mut node_sizes, n_id);
-            }
-            node_sizes[n_id] = seg_len;
-            
-            
-            
-        } else if entrytype == "L" {
-            let (sega,segb) = match  (x.get(1),x.get(3)) {
-                (Some(a),Some(b)) => (a,b),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
-            };
-            let aid;
-            let bid;
-            (curr_id,aid) = get_or_set_node_id(&mut node_ids, curr_id, sega.to_string());
-            (curr_id,bid) = get_or_set_node_id(&mut node_ids, curr_id, segb.to_string());
-            let (axtr,bxtr)= match (x.get(2),x.get(4)) {
-                (Some("+"),Some("+")) => (head(aid),tail(bid)),
-                (Some("+"),Some("-")) => (head(aid),head(bid)),
-                (Some("-"),Some("+")) => (tail(aid),tail(bid)),
-                (Some("-"),Some("-")) => (tail(aid),head(bid)),
-                (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
-            };
-            if adjacencies.len() <= axtr {
-                Self::fill_up_vec(&mut adjacencies, axtr);
-            }
-            if adjacencies.len() <= bxtr {
-                Self::fill_up_vec(&mut adjacencies, bxtr);
-            }
-            //adjacencies.get_mut(&axtr).expect("Horror").insert(bxtr);
-            //adjacencies.get_mut(&bxtr).expect("Horror").insert(axtr);
-            adjacencies.get_mut(axtr).unwrap().push(bxtr);
-            adjacencies.get_mut(bxtr).unwrap().push(axtr);
-            n_edges+=1;
-        } else if entrytype == "P" {
-            let pname = x.get(1).expect("Path does not have a name identifier.");
-            let mut path = x.get(2).expect(&format!("Path '{pname}' missing mandatory gfa field 3.")).split(|x : char| {x==',' || x==';'});
-            let fst = path.nth(0);
-            let lst = path.last();
-            let parse_pend = |x : &str,is_telomere_end : bool| {
-                let x = x.strip_suffix("\n").unwrap_or(x);
-                assert!(x.ends_with("+") || x.ends_with("-"));
-                let mut xp = x.to_owned();
-                xp.pop();
-                let xtr_is_tail = is_telomere_end == x.ends_with("+");
-                (xp,xtr_is_tail)};
-            match (fst,lst) {
-                (Some(f),Some(l)) => {
-                  telomeres.push(parse_pend(f,false));
-                },
-                (_,_) => continue
-            }
-        } else if entrytype == "W" {
-            let wlk = x.get(6).expect("Walk line without walk");
-            let pat = |x : char| {x=='>' || x=='<'};
-            let end = wlk.find(pat);
-            let strt = wlk.rfind(pat);
-            let mut wlki = wlk[1..].split(pat);
-            let fst = wlki.nth(0);
-            let lst = wlki.last();
-            match (fst,lst) {
-                (Some(f),Some(l)) => {
-                  let e_is_tail = wlk.as_bytes()[end.unwrap()] as char == '<';
-                  let s_is_tail = wlk.as_bytes()[strt.unwrap()] as char == '>';
-                  telomeres.push((f.to_owned(),s_is_tail));
-                  telomeres.push((l.to_owned(),e_is_tail));
-                },
-                (_,_) => continue
-            }
-        }
-
+    if !path.ends_with(".gz") {
+        eprintln!("Trying to read uncompressed gfa.");
+        let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
+        return Self::gfa_from_any_reader(&mut rdr);
+    } else{
+        eprintln!("Trying to read compressed gfa.");
+        let fl = File::open(path)?;
+        let gz = GzDecoder::new(fl);
+        let mut rdr =  ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_reader(gz);
+        return Self::gfa_from_any_reader(&mut rdr);
     }
-    eprintln!("Filling in {} telomeres observed in paths",telomeres.len());
-    for (mrk,xtr_is_tail) in telomeres {
-        let m = *node_ids.get(&mrk).expect(&format!("Segment {mrk} occurs in a path, but not as a segment entry."));
-        let xtr = if xtr_is_tail {
-            tail(m)
-        } else  {
-            head(m)
-        };
-        if adjacencies.len() <= xtr {
-                Self::fill_up_vec(&mut adjacencies, xtr);
-        }
-        adjacencies.get_mut(xtr).unwrap().push(0);
-        adjacencies.get_mut(0).unwrap().push(xtr);
-    }
-    //eprintln!("{node_sizes:?}");
-    
-    Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
 }
 
 

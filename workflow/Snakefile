@@ -1,0 +1,34 @@
+
+
+INPUT_DIR='./input/'
+INPUT_GENOMES=['A']
+OUTPUT_DIR = './output/'
+
+SIZE_THRESHOLDS = [0,50,100,200,400,800,1600]
+
+
+rule all_measure:
+    input:
+        expand(OUTPUT_DIR+"measures/{genome}_s{size}.txt",genome=INPUT_GENOMES,size=SIZE_THRESHOLDS)
+
+rule calc_measure:
+    input:
+        genome=INPUT_DIR+"{genome}.gfa.gz",
+        binary="../target/release/carp"
+    output:
+        OUTPUT_DIR+"measures/{genome}_s{size}.txt"
+    threads:
+        8
+    log:
+         OUTPUT_DIR+"logs/carp_{genome}_s{size}.log"
+    benchmark:
+        OUTPUT_DIR+"bench/carp_{genome}_s{size}.txt"
+    shell:
+        '{input.binary} --gfa {input.genome} -t {threads} -m {output} -s {wildcards.size} 2>&1 > {log}'
+
+        
+rule compile:
+    output:
+        "../target/release/carp"
+    shell:
+        "cd ..; cargo build --release"
