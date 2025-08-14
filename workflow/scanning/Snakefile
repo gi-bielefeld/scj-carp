@@ -20,10 +20,10 @@ rule calc_scan:
     threads:
         8
     log:
-         std=OUTPUT_DIR+"logs/carp_{genome}_s{size}.log",
-         err=OUTPUT_DIR+"logs/carp_{genome}_s{size}.errlog"
+         std=OUTPUT_DIR+"logs/scan_c{clen}.log",
+         err=OUTPUT_DIR+"logs/scan_c{clen}.errlog"
     benchmark:
-        OUTPUT_DIR+"bench/carp_{genome}_s{size}.txt"
+        OUTPUT_DIR+"bench/scan_c{clen}.txt"
     shell:
         '{input.binary} --gfa {input.genome} -t {threads} --lower-percentile 1.0 --output-histogram {output} > {log.std} 2> {log.err}'
 
