@@ -5,7 +5,7 @@ use std::time::Duration;
 use csv::{ReaderBuilder,Reader};
 use std::cmp::Ordering;
 use std::thread::{self, sleep};
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
@@ -766,7 +766,7 @@ impl RearrangementGraph for MBG {
     } else{
         eprintln!("Trying to read compressed gfa.");
         let fl = File::open(path)?;
-        let gz = GzDecoder::new(fl);
+        let gz = MultiGzDecoder::new(fl);
         let mut rdr =  ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_reader(gz);
         return Self::gfa_from_any_reader(&mut rdr);
     }
