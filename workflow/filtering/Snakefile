@@ -14,11 +14,11 @@ rule all_measure:
 rule calc_measure:
     input:
         genome=INPUT_DIR+"{genome}.gfa.gz",
-        binary="../target/release/carp"
+        binary="../../target/release/carp"
     output:
         OUTPUT_DIR+"measures/{genome}_s{size}.txt"
     threads:
-        8
+        16
     log:
          std=OUTPUT_DIR+"logs/carp_{genome}_s{size}.log",
          err=OUTPUT_DIR+"logs/carp_{genome}_s{size}.errlog"
@@ -30,6 +30,6 @@ rule calc_measure:
         
 rule compile:
     output:
-        "../target/release/carp"
+        "../../target/release/carp"
     shell:
         "cd ..; cargo build --release"

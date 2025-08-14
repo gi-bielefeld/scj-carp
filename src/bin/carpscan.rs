@@ -5,7 +5,7 @@ use clap::{arg, value_parser, ArgGroup, Command};
 use scj_carp_rust::*;
 use std::thread;
 
-
+const ONE_MILLION :usize = 1000000;
 
 fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &[usize],thread_num : usize) -> HashMap<Marker,usize> {
     let mut node_complexities = HashMap::new();
@@ -36,7 +36,7 @@ fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &
 fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : usize, end : usize,thread_num : usize) -> HashMap<Marker,usize> {
     let mut node_complexities = HashMap::new();
     let tot_size = end - start;
-    let about_five_percent = (tot_size/20 +1);
+    let about_five_percent = (tot_size/20 +1).min(ONE_MILLION);
     //eprintln!("Thread {thread_num}: {about_ten_percent}");
     let mut i = 0;
     for m in start..end {
