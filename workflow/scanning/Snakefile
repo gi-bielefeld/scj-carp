@@ -25,7 +25,7 @@ rule calc_scan:
     benchmark:
         OUTPUT_DIR+"bench/scan_c{clen}.txt"
     shell:
-        '{input.binary} --gfa {input.genome} -t {threads} --lower-percentile 1.0 --output-histogram {output} > {log.std} 2> {log.err}'
+        '{input.binary} --gfa {input.genome} -t {threads} --lower-percentile 1.0 --output-histogram {output} -c {wildcards.clen} > {log.std} 2> {log.err}'
 
         
 rule compile:

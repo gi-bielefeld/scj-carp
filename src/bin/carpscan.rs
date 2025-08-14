@@ -36,7 +36,7 @@ fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &
 fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : usize, end : usize,thread_num : usize) -> HashMap<Marker,usize> {
     let mut node_complexities = HashMap::new();
     let tot_size = end - start;
-    let about_five_percent = (tot_size/20 +1).min(ONE_MILLION);
+    let about_one_percent = (tot_size/100 +1).min(ONE_MILLION);
     //eprintln!("Thread {thread_num}: {about_ten_percent}");
     let mut i = 0;
     for m in start..end {
@@ -48,7 +48,7 @@ fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : u
         let ci = carp_measure_from_adjacencies(&adjacencies);
         node_complexities.insert(m,ci);
         i+=1;
-        if i%(about_five_percent) == 0 {
+        if i%(about_one_percent) == 0 {
             let percentage = i*100/tot_size;
             eprintln!("Thread {thread_num} processed {i}/{tot_size} nodes ({percentage}%).");
         }
