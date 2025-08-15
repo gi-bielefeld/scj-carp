@@ -85,7 +85,7 @@ Self: Sync
     fn degree(&self,n:Extremity) -> Option<usize>;
     fn adj_neighbors(&self,n:Extremity) -> Option<impl Iterator<Item=Extremity>>;
     fn node_size(&self,n:Marker) -> Option<usize>;
-    fn trim(&mut self, min_size : usize);
+    fn trim_singlethread(&mut self, min_size : usize);
     fn trim_multithread(&mut self, min_size : usize,n_threads : usize);
     fn markers(&self) -> impl Iterator<Item=Marker>;
     fn iter_adjacencies(&self) -> impl Iterator<Item=Adjacency>;
@@ -116,7 +116,7 @@ impl RearrangementGraph for UBG  {
         self.node_ids.values().into_iter().copied()
     }
 
-    fn trim(&mut self, threshold : usize) {
+    fn trim_singlethread(&mut self, threshold : usize) {
         let mut to_remove = HashSet::new();
         for (node,sz) in self.node_sizes.iter() {
             if *sz < threshold {
@@ -172,7 +172,7 @@ impl RearrangementGraph for UBG  {
     
     fn trim_multithread(&mut self, min_size : usize,n_threads : usize) {
         if n_threads <= 1 {
-            self.trim(min_size);
+            self.trim_singlethread(min_size);
         } else {
              panic!("Not implemented!");
         }
@@ -608,10 +608,78 @@ impl MBG {
         
         Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
     }
+    
+    fn identify_removal_nodes_in_range(&self, min_size: usize,from : Marker, to:Marker) -> Vec<Marker> {
+        let mut to_remove = Vec::new();
+        for (offset,size) in self.node_sizes[from..to].iter().enumerate() {
+            let m = offset+from;
+            if *size < min_size {
+                to_remove.push(m);
+            }
+        }
+        to_remove
+    }
+
+    fn identify_removal_nodes(&self, min_size: usize) -> Vec<Marker> {
+        self.identify_removal_nodes_in_range(min_size, 1, self.num_markers())
+    }
 
 
+
+    fn identify_removal_nodes_mthread(&self,min_size: usize,n_threads : usize) -> Vec<Marker> {
+        let mut to_remove = Vec::new();
+        thread::scope(|scope| {
+            let nmarkers =  self.num_markers();
+            let mut handles = Vec::new();
+            let slice_size =nmarkers/n_threads +1;
+            for i in 0..n_threads {
+                let g = &self;min_size;
+                let lb = (slice_size*i).min(nmarkers);
+                let rb = (slice_size*(i+1)).min(nmarkers);
+                eprintln!("Spawning thread {i} processing markers with index {lb} to {rb} (total {nmarkers})");
+                let x =  scope.spawn(move || g.identify_removal_nodes_in_range(min_size, lb, rb));
+                handles.push(x);
+            }
+            eprintln!("Joining results.");
+            for x in handles {
+                to_remove.extend(x.join().unwrap());
+            }
+        
+    });
+        to_remove
+    }
+    
+    fn remove_all(&mut self, to_remove: &Vec<Marker>) {
+        let tsize = to_remove.len();
+        let about_one_percent = (tsize/100).max(1).min(ONE_MILLION/10);
+        for (i,m) in to_remove.iter().copied().enumerate() {
+            if (i+1)%about_one_percent==0{
+                eprintln!("Removal processed {i}/{tsize} markers.");
+            }
+            self.remove_marker(m);
+
+        }
+    }
+
+    pub fn trim_any(&mut self,min_size: usize, n_threads : usize) {
+        if n_threads == 1 {
+            eprintln!("Trimming singlethreaded.");
+            self.trim_singlethread(min_size);
+            return;
+        }
+        let rm = self.identify_removal_nodes_mthread(min_size, n_threads);
+        if rm.len() >= self.num_markers()/10 {
+            eprintln!("More then 10% of nodes are scheduled for removal. Trimming singlethreaded.");
+            self.remove_all(&rm);
+            return;
+        }
+        self.trim_multithread(min_size, n_threads);
+    }
 
 }
+
+
+
 
 
 fn has_deleted_neighbor(graph : &MBG, extremity : Extremity, size_threshold : usize) -> bool {
@@ -711,18 +779,11 @@ impl RearrangementGraph for MBG {
        }
     }
 
-    fn trim(&mut self, min_size : usize) {
-        let mut to_remove = Vec::new();
+    fn trim_singlethread(&mut self, min_size : usize) {
         let nbefore = self.num_markers();
-        for (m,size) in self.node_sizes.iter().enumerate() {
-            if *size < min_size {
-                to_remove.push(m);
-            }
-        }
+        let to_remove = self.identify_removal_nodes(min_size);
         eprintln!("Identified {} markers for removal.",to_remove.len());
-        for m in to_remove {
-            self.remove_marker(m);
-        }
+        self.remove_all(&to_remove);
         if self.num_markers() < nbefore/10 {
             eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
         }
@@ -853,12 +914,13 @@ fn name_to_marker(&self,name : &str) -> Option<Marker> {
 fn marker_names(&self) -> HashMap<Marker,String> {
     reverse_map(&self.node_ids)
 }
+
 fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
 
     let adj = &self.adjacencies.len();
 
     if n_threads <= 1 {
-        self.trim(min_size);
+        self.trim_singlethread(min_size);
         return;
     }
     let max_xt = self.adjacencies.len();
@@ -1013,7 +1075,7 @@ mod tests {
         let mut ubg = T::from_hash_maps(node_siz, adj, node_ids);
 
         if n_threads == 1 {
-            ubg.trim(2);
+            ubg.trim_singlethread(2);
         } else {
             ubg.trim_multithread(2, n_threads);
         }
@@ -1298,7 +1360,7 @@ mod tests {
         general_ubg_sanity_check(&ubg);
         for i in 32..35 {
             let mut ubg = ubg. clone();
-            ubg.trim(i);
+            ubg.trim_singlethread(i);
             for nt in 1..9 {
                 let mut mbg = mbg. clone();
                 mbg.trim_multithread(i,nt);

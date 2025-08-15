@@ -273,7 +273,7 @@ fn main() {
     eprintln!("Adding telomeres to complete graph.");
     graph.fill_telomeres();
     eprintln!("Trimming graph.");
-    graph.trim_multithread(thresh,n_threads);
+    graph.trim_any(thresh,n_threads);
     graph.fill_telomeres();
     let node_c  =  scan_graph_enum_multithread(&graph, contextlen,n_threads);
     let mn = *node_c.values().min().unwrap();

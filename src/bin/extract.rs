@@ -27,7 +27,7 @@ fn main() {
     graph.fill_telomeres();
     if thresh > 0 {
         eprintln!("Trimming graph.");
-        graph.trim(thresh);
+        graph.trim_singlethread(thresh);
     }
     graph.fill_telomeres();
     let start_node : &String = matches.get_one(&"start-node").expect("CLI Parsing gone wrong");
