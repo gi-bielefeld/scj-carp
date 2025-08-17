@@ -55,9 +55,9 @@ if args.color_ns:
     for lo,hi,cl in zip(args.color_ns,args.color_ns[1::],colors[1::]):
         plt.bar(bucket_centers[lo:hi],buckets[lo:hi],width=(mx-mn)/args.num_buckets,color=cl)
 
-curr_t = list(range(0,12000,500))
+curr_t = list(range(5000,38000,5000))
 curr_l = curr_t
-#plt.xticks(curr_t+[50,140,800,10000],labels=curr_l+["A","B","C","D"])
+plt.xticks(curr_t+[100,500,1500,35000],labels=curr_l+["A","B","C","D"])
 plt.xlabel(args.xlabel)
 plt.ylabel("Number of Nodes")
 #plt.yscale("log")

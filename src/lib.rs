@@ -611,6 +611,9 @@ impl MBG {
     
     fn identify_removal_nodes_in_range(&self, min_size: usize,from : Marker, to:Marker) -> Vec<Marker> {
         let mut to_remove = Vec::new();
+        if from >=to {
+            return  to_remove;
+        }
         for (offset,size) in self.node_sizes[from..to].iter().enumerate() {
             let m = offset+from;
             if *size < min_size {
