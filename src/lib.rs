@@ -624,7 +624,7 @@ impl MBG {
     }
 
     fn identify_removal_nodes(&self, min_size: usize) -> Vec<Marker> {
-        self.identify_removal_nodes_in_range(min_size, 1, self.num_markers())
+        self.identify_removal_nodes_in_range(min_size, 1, self.num_markers()+1)
     }
 
 
@@ -1077,6 +1077,8 @@ mod tests {
         adj.get_mut(&tail(3)).expect("!").insert(head(2));
         let mut ubg = T::from_hash_maps(node_siz, adj, node_ids);
 
+
+        eprintln!("mtest nthreads {n_threads}");
         if n_threads == 1 {
             ubg.trim_singlethread(2);
         } else {

@@ -36,7 +36,18 @@ for e,w in zip(elems,weights):
 
 
 
+def w_median(elems,weights):
+    half_w = sum(weights)/2
+    cum = 0
+    ll = sorted(list(zip(elems,weights)))
+    for e,w in ll:
+        cum+=w
+        if cum >= half_w:
+            return e
 
+
+print("Median element:",w_median(elems,weights))
+        
 
 
 
