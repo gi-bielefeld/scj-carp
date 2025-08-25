@@ -636,7 +636,7 @@ impl MBG {
             let mut handles = Vec::new();
             let slice_size =nmarkers/n_threads +1;
             for i in 0..n_threads {
-                let g = &self;min_size;
+                let g = &self;
                 let lb = (slice_size*i).min(nmarkers);
                 let rb = (slice_size*(i+1)).min(nmarkers);
                 eprintln!("Spawning thread {i} processing markers with index {lb} to {rb} (total {nmarkers})");
