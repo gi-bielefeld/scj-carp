@@ -38,7 +38,7 @@ rule all_default_zombi_trees:
 
 rule cargo_build:
     output:
-        './target/release/scj-carp-rust'
+        './target/release/carp'
     shell:
         'cargo build -r'
 
@@ -82,7 +82,7 @@ rule prec_recall:
 rule run_carp:
     input:
         pgnm='pangenome/z_{params}/unimog.txt',
-        binary = 'target/release/scj-carp-rust'
+        binary = 'target/release/carp'
     output:
         ci='carp/measures/z_{params}/measure.txt',
         ca='carp/adjacencies/z_{params}/adj.txt'
