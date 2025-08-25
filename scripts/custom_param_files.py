@@ -8,15 +8,20 @@ GENOME_TEMPLATE_TRANSFER="""### PARAMETERS GENOME LEVEL ###
 ## Rates represent the frequency (and fixation probability) of the different events measure in time units (see your Species Tree)
 ##
 #
-DUPLICATION f:0.5 #changed
+DUPLICATION f:0.5
+#changed
 TRANSFER f:{transfer}
-LOSS f:1.5 #changed
+LOSS f:1.5
+#changed
 #
 ## The next three events use always genome-wise rates
 #
-INVERSION f:1 #changed
-TRANSPOSITION f:1 #changed
-ORIGINATION f:1 #changed
+INVERSION f:1
+#changed
+TRANSPOSITION f:1
+#changed
+ORIGINATION f:1
+#changed
 #
 ## Extensions. Extensions determine how many contiguous genes are affected by a single event
 #
