@@ -67,7 +67,7 @@ rule transfer_common:
     output:
         'transferexp/z_transfer{t}_sample{s}/summary.txt'
     shell:
-        'echo $(cat {input.ms} |  sed "s/Carp index: /{wildcards.t},/"),$(cat {input.pr}) > {output}'
+        'echo $(head -n 1 {input.ms} |  sed "s/Carp index: /{wildcards.t},/"),$(cat {input.pr}) > {output}'
     
 
 rule prec_recall:
