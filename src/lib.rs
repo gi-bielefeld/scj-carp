@@ -1,11 +1,14 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
+use std::hash::Hash;
 use std::io::{self, BufRead, BufReader};
 use std::time::Duration;
 use csv::{ReaderBuilder,Reader};
 use std::cmp::Ordering;
 use std::thread::{self, sleep};
 use flate2::read::MultiGzDecoder;
+use itertools::Itertools;
+
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
@@ -102,7 +105,11 @@ Self: Sync
 
 impl RearrangementGraph for UBG  {
     fn degree(&self,n:Extremity) -> Option<usize> {
-        Some(self.adjacencies.get(&n)?.len())
+        let neighb = self.adjacencies.get(&n)?;
+        if ! neighb.contains(&n) {
+            return Some(neighb.len())
+        }
+        Some(neighb.len()+1)
     }
 
     fn adj_neighbors(&self,n:Extremity) -> Option<impl Iterator<Item=Extremity>> {
@@ -167,7 +174,10 @@ impl RearrangementGraph for UBG  {
         for x in xd {
             self.node_ids.remove(&x);
         }
-
+        //remove any accidentally created self loops of the telomere
+        if let Some(tladj) = self.adjacencies.get_mut(&0) {
+            tladj.remove(&0);
+        }
     }
     
     fn trim_multithread(&mut self, min_size : usize,n_threads : usize) {
@@ -183,7 +193,7 @@ impl RearrangementGraph for UBG  {
     fn iter_adjacencies(&self) -> impl Iterator<Item=Adjacency> {
         self.adjacencies.iter().flat_map(|(x,neighbors)| {
             neighbors.iter().filter_map(|y| {
-                if *y >*x {
+                if *y >= *x {
                     Some((*x,*y))
                 } else {
                     None
@@ -379,7 +389,7 @@ pub struct MBG {
     node_sizes : Vec<usize>,
     adjacencies : Vec<Vec<Extremity>>,
     node_ids : HashMap<String,Marker>,
-    masked_markers : HashSet<Marker>
+    masked_markers : HashSet<Marker>,
 }
 
 
@@ -409,10 +419,18 @@ impl MBG {
                 for y in &tailnb {
                     if *y != head(m) && *y != tail(m) {
                         xneighbors.insert(*y);
+                    }
                 }
-            } 
+            }
+            //prevent 0,0 adjacency
+            if *x==0 && xneighbors.contains(&0) {
+                xneighbors.remove(&0);
             }
             self.adjacencies[*x] = xneighbors.iter().copied().collect();
+            //for degree purposes add x to itself twice
+            if xneighbors.contains(x) {
+                self.adjacencies[*x].push(*x);
+            }
         }
 
         for x in &headnb {
@@ -430,10 +448,18 @@ impl MBG {
                 for y in &headnb {
                     if *y != head(m) && *y != tail(m) {
                         xneighbors.insert(*y);
-                }
-            } 
+                    }
+                } 
+            }
+             //prevent 0,0 adjacency
+            if *x==0 && xneighbors.contains(&0) {
+                xneighbors.remove(&0);
             }
             self.adjacencies[*x]=xneighbors.iter().copied().collect();
+            //for degree purposes add x to itself twice
+            if xneighbors.contains(x) {
+                self.adjacencies[*x].push(*x);
+            }
         }
 
         
@@ -451,7 +477,7 @@ impl MBG {
     }
     
     
-    fn find_solid_neighbors(&self, start : Extremity, size_threshold : usize) -> Vec<Extremity> {
+    fn find_solid_neighbors(&self, start : Extremity, size_threshold : usize) -> HashSet<Extremity> {
         let mut stack = Vec::new();
         let mut visited = HashSet::new();
         let mut solid_neighbors = HashSet::new();
@@ -471,8 +497,9 @@ impl MBG {
                 
             }
         }
-        solid_neighbors.iter().copied().collect()
+        solid_neighbors
     }
+
 
     fn gfa_from_any_reader<R>(rdr : &mut Reader<R>) -> Result<MBG, io::Error>
     where 
@@ -486,6 +513,7 @@ impl MBG {
         let mut i :usize = 0;
         let mut n_edges :usize = 0;
         let mut telomeres : Vec<(String,bool)> = Vec::new();
+        let mut seen_edges = HashSet::new();
         for res in rdr.records() {
             let x = res?;
             i+=1;
@@ -549,9 +577,14 @@ impl MBG {
                 }
                 //adjacencies.get_mut(&axtr).expect("Horror").insert(bxtr);
                 //adjacencies.get_mut(&bxtr).expect("Horror").insert(axtr);
-                adjacencies.get_mut(axtr).unwrap().push(bxtr);
-                adjacencies.get_mut(bxtr).unwrap().push(axtr);
-                n_edges+=1;
+                let cane = canonicize((axtr,bxtr));
+                if !seen_edges.contains(&cane) {
+                    adjacencies.get_mut(axtr).unwrap().push(bxtr);
+                    adjacencies.get_mut(bxtr).unwrap().push(axtr);
+                     n_edges+=1;
+                    seen_edges.insert(cane);
+                }
+                
             } else if entrytype == "P" {
                 let pname = x.get(1).expect("Path does not have a name identifier.");
                 let mut path = x.get(2).expect(&format!("Path '{pname}' missing mandatory gfa field 3.")).split(|x : char| {x==',' || x==';'});
@@ -711,7 +744,17 @@ fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshol
                 masked.insert(m);
                 //eprintln!("Deleting marker {m}...");
             } else if has_deleted_neighbor(graph, i, size_threshold) {
-                adjacencies.push((i,graph.find_solid_neighbors(i, size_threshold)));
+                let mut sn = graph.find_solid_neighbors(i, size_threshold);
+                //prevent adjacency 0,0 from appearing
+                if i==0 && sn.contains(&0) {
+                    sn.remove(&0);
+                }
+                let mut locadj : Vec<Extremity> = sn.iter().copied().collect();
+                if sn.contains(&i) {
+                    //degree purposes
+                    locadj.push(i);
+                }
+                adjacencies.push((i,locadj));
             }
             if (i - from)%ONE_MILLION == 0 && i > from {
                 let proc_nodes = i-from;
@@ -754,12 +797,12 @@ impl RearrangementGraph for MBG {
     fn iter_adjacencies(&self) -> impl Iterator<Item=Adjacency> {
         self.adjacencies.iter().enumerate().flat_map(|(xtr,neighb)|{
          neighb.iter().filter_map(move |ytr| {
-        if xtr < *ytr {
+        if xtr <= *ytr {
             Some((xtr,*ytr))
         } else {
             None
             }})    
-        })
+        }).unique()
     }
 
     fn node_size(&self,n:Marker) -> Option<usize> {
@@ -805,6 +848,10 @@ impl RearrangementGraph for MBG {
 
         for (x,neighb) in adj {
             adjacencies[x] =  neighb.iter().copied().collect();
+            if neighb.contains(&x) {
+                adjacencies[x].push(x);
+                //selfies.insert(x);
+            }
         }
 
         
@@ -920,8 +967,6 @@ fn marker_names(&self) -> HashMap<Marker,String> {
 
 fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
 
-    let adj = &self.adjacencies.len();
-
     if n_threads <= 1 {
         self.trim_singlethread(min_size);
         return;
@@ -959,7 +1004,6 @@ fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
     if self.num_markers() < nbefore/10 {
             eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
     }
-    let adj = &self.adjacencies.len();
 }
     
     
@@ -1022,6 +1066,8 @@ pub fn marker(xtr : Extremity) -> Marker {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::read_dir;
+
     use super::*;
     #[test]
     fn test_hdtl() {
@@ -1201,6 +1247,87 @@ mod tests {
         assert!(collect_neighbors(&ubg,head(nd6)).eq(&HashSet::from([0])));
     }
 
+
+    #[test]
+    fn test_self_cyle() {
+        eprintln!("self cycle test ubg");
+        mtest_self_cycle::<UBG>();
+        eprintln!("self cycle test mbg");
+        mtest_self_cycle::<MBG>();
+    }
+
+    fn mtest_self_cycle<T>()
+    where T : RearrangementGraph
+    {
+        let mut sizes = HashMap::new();
+        let mut adj = HashMap::new();
+        let mut nids = HashMap::new();
+        nids.insert(String::from("A"), 1);
+        sizes.insert(1,1);
+        adj.insert(head(1),HashSet::from([head(1)]));
+        adj.insert(tail(1), HashSet::from([0]));
+        adj.insert(0, HashSet::from([tail(1)]));
+        let mut g = T::from_hash_maps(sizes, adj, nids);
+        let (a,b) = calc_carp_measure_multithread(&g, 1);
+        let mut aexp = Vec::new();
+        aexp.push((head(1),head(1)));
+        assert_eq!(a,aexp);
+    }
+
+
+    #[test]
+    fn test_random_gfa() {
+        for i in read_dir("testfiles/random/").expect("W") {
+            let x = i.expect("AAAAAAA");
+            let tmpval = x.path();
+            let gfafile = tmpval.to_str().unwrap();
+            eprintln!("Tesing {gfafile}");
+            let mut ubg = UBG::from_gfa(gfafile).expect("X");
+            ubg.fill_telomeres();
+            let mut mbg = MBG::from_gfa(gfafile).expect("Y");
+            mbg.fill_telomeres();
+            eprintln!("Sanity checking UBG.");
+            general_ubg_sanity_check(&ubg);
+            eprintln!("Sanity checking MBG.");
+            general_ubg_sanity_check(&mbg);
+            eprintln!("Eq check");
+            equivalence_check(&ubg, &mbg);
+            for flt in 0..10 {
+                eprintln!("Filtersize or smth: {flt}");
+                let mut ubg_ = ubg.clone();
+                let mut mbg_ = mbg.clone();
+                ubg_.trim_singlethread(flt);
+                mbg_.trim_singlethread(flt);
+                
+                eprintln!("Sanity checking UBG.");
+                general_ubg_sanity_check(&ubg_);
+                eprintln!("Sanity checking MBG.");
+                general_ubg_sanity_check(&mbg_);
+                eprintln!("Eq check");
+                equivalence_check(&ubg_, &mbg_);
+                for i in 2..8 {
+                    let mut mbg_mtt = mbg.clone();
+                    mbg_mtt.trim_multithread(flt, i);
+                    general_ubg_sanity_check(&mbg_mtt);
+                    equivalence_check(&mbg_, &mbg_mtt);
+                }
+                let (c,uc) = calc_carp_measure_naive(&ubg_);
+                let (cc,ucc) = calc_carp_measure_naive(&mbg_);
+                let ac = carp_measure_from_adjacencies(&ubg_.iter_adjacencies().collect());
+                let acc = carp_measure_from_adjacencies(&mbg_.iter_adjacencies().collect());
+                eprintln!("diff ja lol ey {:?}",c.symmetric_difference(&cc));
+                assert_eq!(c,cc);
+                assert_eq!(uc,ucc);
+                assert_eq!(ac,acc);
+                assert_eq!(c.len(),ac);
+                assert_eq!(cc.len(),acc);
+                carp_sanity_check(&mbg_, &c, &uc);
+            }
+
+           
+        }
+    }
+
     #[test]
     fn test_read_gfa_fail() {
         mtest_read_gfa_fail::<UBG>();
@@ -1269,6 +1396,9 @@ mod tests {
     fn carp_multithread_sanity_check(ubg : &impl RearrangementGraph, contested : &HashSet<Adjacency>, uncontested : &HashSet<Adjacency>) {
         for i in 1..8 {
             let (c, uc) = calc_carp_measure_multithread(ubg, i);
+            assert_eq!(find_dups(&c),Vec::new());
+            assert_eq!(find_dups(&uc),Vec::new());
+            eprintln!("El difference: {:?}",contested.symmetric_difference(&c.iter().copied().collect()));
             assert_eq!(c.len(),contested.len());
             assert_eq!(uc.len(),uncontested.len());
             let cs : HashSet<Adjacency> = c.iter().copied().collect();
@@ -1284,19 +1414,22 @@ mod tests {
             all.insert(canonicize((x,y)));
             
         }
+        //eprintln!("Mief: {:?}",contested.difference(&all).sorted());
         assert!(contested.is_subset(&all));
         assert!(uncontested.is_subset(&all));
         assert!(contested.is_disjoint(uncontested));
         let union : HashSet<Adjacency> = contested.union(uncontested).cloned().collect();
+        //eprintln!("Sym diff: {:?}",all.symmetric_difference(&union));
         assert_eq!(all,union);
         for (x,y) in contested {
             assert!(ubg.adj_neighbors(*x).unwrap().collect::<Vec<_>>().len()>1 
-                || ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()>1);
+                || ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()>1 || *x==*y);
             assert!(*x!=0 && *y!=0);
         }
         for (x,y) in uncontested {
-            assert!(ubg.adj_neighbors(*x).unwrap().collect::<Vec<_>>().len()==1 
-                && ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()==1);
+            assert!((ubg.adj_neighbors(*x).unwrap().collect::<Vec<_>>().len()==1 
+                && ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()==1 && *x!=*y)
+                || *x==0 || *y==0);
             assert!(ubg.adj_neighbors(*x).unwrap().collect::<HashSet<_>>().contains(y)
                 && ubg.adj_neighbors(*y).unwrap().collect::<HashSet<_>>().contains(x))
         }
@@ -1346,8 +1479,13 @@ mod tests {
         assert!(a_u.len()==0);
         let m1 : HashSet<Marker> = g1.markers().collect();
         let m2 : HashSet<Marker> = g2.markers().collect();
+        eprintln!("{m1:?}");
         assert_eq!(m1,m2);
-        let ms1 : HashSet<(Marker,usize)> = m1.iter().map(|x| (*x,g1.node_size(*x).unwrap())).collect();
+        let ms1 : HashSet<(Marker,usize)> = m1.iter().map(|x| 
+            {
+            //eprintln!("{x}");
+            (*x,g1.node_size(*x).unwrap())
+            }).collect();
         let ms2 : HashSet<(Marker,usize)> = m2.iter().map(|x| (*x,g2.node_size(*x).unwrap())).collect();
         assert_eq!(ms1,ms2);
     }
@@ -1514,7 +1652,7 @@ pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<Adjacency>) -> usize
         *yv+=1;
     }
     for (x,y) in adjacencies {
-        if *degrees.get(x).unwrap() > 1 || *degrees.get(y).unwrap() > 1 {
+        if (*degrees.get(x).unwrap() > 1 || *degrees.get(y).unwrap() > 1) && !(*x== 0) && !(*y == 0) {
             carp_measure+=1;
         }
     }
@@ -1612,19 +1750,47 @@ fn is_my_adjacency((x,y) : Adjacency) -> bool {
     hx < hy || (hx == hy && x <= y)
 }
 
+
+fn find_dups<T>(v: &Vec<T>) -> Vec<T>
+where 
+    T : Eq,
+    T : Hash,
+    T: Copy
+{
+    let mut seen = HashSet::new();
+    let mut dups = Vec::new();
+    for x in v {
+        if seen.contains(x) {
+            dups.push(*x)
+        }
+        seen.insert(*x);
+    }
+    dups
+}
+
 pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Extremity],threadnum: usize) -> (Vec<Adjacency>,Vec<Adjacency>) {
     let mut contested = Vec::new();
     let mut uncontested = Vec::new();
     for x in extremities {
         let degx = graph.degree(*x).unwrap();
         if let Some(neighbors) = graph.adj_neighbors(*x) {
+            let mut self_seen = false;
             for y in  neighbors{
                 let degy = graph.degree(y).unwrap();
                 if !is_my_adjacency((*x,y)) {
                     continue;
                 }
-                if degx > 1 || degy > 1 {
+
+                if *x==y {
+                    if !self_seen {
+                        contested.push(canonicize((*x,y)));
+                    }
+                    self_seen=true;
+                } else if *x==0 || y==0 {
+                    uncontested.push(canonicize((*x,y)));
+                } else if degx > 1 || degy > 1 {
                     contested.push(canonicize((*x,y)));
+                    //eprintln!("pushing {x} {y}");
                 } else {
                     uncontested.push(canonicize((*x,y)));
                 }
@@ -1632,6 +1798,8 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
         }
         
     }
+    assert_eq!(find_dups(&contested),Vec::new());
+    assert_eq!(find_dups(&uncontested),Vec::new());
     (contested,uncontested)
 }
 
@@ -1670,11 +1838,15 @@ pub fn calc_carp_measure_multithread(graph : &impl RearrangementGraph, n_threads
 pub fn calc_carp_measure_naive(graph : &impl RearrangementGraph) -> (HashSet<Adjacency>,HashSet<Adjacency>){
     let mut contested = HashSet::new();
     let mut uncontested = HashSet::new();
+    let adjset : HashSet<Adjacency>= graph.iter_adjacencies().collect();
     for xtr in graph.extremities() {
         if xtr <= 1 {
+            for nxtr in graph.adj_neighbors(xtr).unwrap() {
+                uncontested.insert((xtr, nxtr));
+            }
             continue
         }
-        let is_contested=graph.degree(xtr).unwrap_or(0)>1;
+        let is_contested=graph.degree(xtr).unwrap()>1;
         //If vertex has degree > 0, it must have neighbors
         let neighb = graph.adj_neighbors(xtr).unwrap();
         for nxtr in neighb {
@@ -1682,6 +1854,8 @@ pub fn calc_carp_measure_naive(graph : &impl RearrangementGraph) -> (HashSet<Adj
                 continue;
             }
             let e =canonicize((nxtr,xtr));
+            eprintln!("{e:?}");
+            assert!(adjset.contains(&e));
             if is_contested {
                 contested.insert(e);
                 uncontested.remove(&e);
