@@ -11,6 +11,7 @@ use itertools::Itertools;
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
+const TELOMERE : Extremity = 0;
 
 pub const CARP_LOGO : &str = 
 "   oo.              You're running SCJ CARP
@@ -147,13 +148,13 @@ impl RearrangementGraph for UBG  {
             self.node_ids.remove(&x);
         }
         //remove any accidentally created self loops of the telomere
-        if let Some(tladj) = self.adjacencies.get_mut(&0) {
-            tladj.remove(&0);
+        if let Some(tladj) = self.adjacencies.get_mut(&TELOMERE) {
+            tladj.remove(&TELOMERE);
         }
 
         //remove the telomere if it's empty
-        if self.degree(0).unwrap_or(0) == 0 {
-            self.adjacencies.remove(&0);
+        if self.degree(TELOMERE).unwrap_or(0) == 0 {
+            self.adjacencies.remove(&TELOMERE);
         }
     }
     
@@ -331,10 +332,10 @@ fn from_unimog(path : &str) -> io::Result<UBG> {
                 adjacencies.entry(xta).or_insert(HashSet::new()).insert(xtb);
                 adjacencies.entry(xtb).or_insert(HashSet::new()).insert(xta);
             } else if line.starts_with("|") {
-                adjacencies.entry(0).or_insert(HashSet::new()).insert(xtb);
-                adjacencies.entry(0).or_insert(HashSet::new()).insert(xta);
-                adjacencies.entry(xta).or_insert(HashSet::new()).insert(0);
-                adjacencies.entry(xtb).or_insert(HashSet::new()).insert(0);
+                adjacencies.entry(TELOMERE).or_insert(HashSet::new()).insert(xtb);
+                adjacencies.entry(TELOMERE).or_insert(HashSet::new()).insert(xta);
+                adjacencies.entry(xta).or_insert(HashSet::new()).insert(TELOMERE);
+                adjacencies.entry(xtb).or_insert(HashSet::new()).insert(TELOMERE);
             } else {
                 return Err(io::Error::new(io::ErrorKind::Other,"Invalid chromosome end."));
             }
@@ -400,8 +401,8 @@ impl MBG {
                 }
             }
             //prevent 0,0 adjacency
-            if *x==0 && xneighbors.contains(&0) {
-                xneighbors.remove(&0);
+            if *x==TELOMERE && xneighbors.contains(&TELOMERE) {
+                xneighbors.remove(&TELOMERE);
             }
             self.adjacencies[*x] = xneighbors.iter().copied().collect();
             //for degree purposes add x to itself twice
@@ -429,8 +430,8 @@ impl MBG {
                 } 
             }
              //prevent 0,0 adjacency
-            if *x==0 && xneighbors.contains(&0) {
-                xneighbors.remove(&0);
+            if *x==TELOMERE && xneighbors.contains(&TELOMERE) {
+                xneighbors.remove(&TELOMERE);
             }
             self.adjacencies[*x]=xneighbors.iter().copied().collect();
             //for degree purposes add x to itself twice
@@ -465,7 +466,7 @@ impl MBG {
             for y in self.adj_neighbors(x).unwrap() {
                 let z = other(y);
 
-                    if self.node_size(marker(y)).unwrap_or(0) >= size_threshold || z==0 {
+                    if self.node_size(marker(y)).unwrap_or(0) >= size_threshold || z==TELOMERE {
                         solid_neighbors.insert(y);
                     } else if !visited.contains(&z) {
                         //eprintln!("Skipping over marker {}, size {:?}",marker(y),self.node_size(marker(y)));
@@ -619,12 +620,12 @@ impl MBG {
             if adjacencies.len() <= xtr {
                     Self::fill_up_vec(&mut adjacencies, xtr);
             }
-            adjacencies.get_mut(xtr).unwrap().push(0);
-            adjacencies.get_mut(0).unwrap().push(xtr);
+            adjacencies.get_mut(xtr).unwrap().push(TELOMERE);
+            adjacencies.get_mut(TELOMERE).unwrap().push(xtr);
         }
         //eprintln!("{node_sizes:?}");
         
-        Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0]) })
+        Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE]) })
     }
     
     fn identify_removal_nodes_in_range(&self, min_size: usize,from : Marker, to:Marker) -> Vec<Marker> {
@@ -705,7 +706,7 @@ impl MBG {
 
 fn has_deleted_neighbor(graph : &MBG, extremity : Extremity, size_threshold : usize) -> bool {
     for x in graph.adj_neighbors(extremity).unwrap() {
-        if graph.node_size(marker(x)).unwrap_or(0) < size_threshold && x != 0 {
+        if graph.node_size(marker(x)).unwrap_or(0) < size_threshold && x != TELOMERE {
             return true;
         }
     }
@@ -722,17 +723,17 @@ fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshol
             if i == 1 {
                 continue;
             }
-            if graph.masked_markers.contains(&m) && i != 0 {
+            if graph.masked_markers.contains(&m) && i != TELOMERE {
                 continue;
             }
-            if graph.node_size(m).unwrap_or(0) < size_threshold && m != 0 {
+            if graph.node_size(m).unwrap_or(0) < size_threshold && m != TELOMERE {
                 masked.insert(m);
                 //eprintln!("Deleting marker {m}...");
             } else if has_deleted_neighbor(graph, i, size_threshold) {
                 let mut sn = graph.find_solid_neighbors(i, size_threshold);
                 //prevent adjacency 0,0 from appearing
-                if i==0 && sn.contains(&0) {
-                    sn.remove(&0);
+                if i==TELOMERE && sn.contains(&TELOMERE) {
+                    sn.remove(&TELOMERE);
                 }
                 let mut locadj : Vec<Extremity> = sn.iter().copied().collect();
                 if sn.contains(&i) {
@@ -753,14 +754,14 @@ fn __trim_vertices(graph : &MBG, from : Extremity, to : Extremity, size_threshol
 
 impl RearrangementGraph for MBG {
     fn degree(&self,n:Extremity) -> Option<usize> {
-        if self.masked_markers.contains(&marker(n)) && n!=0 {
+        if self.masked_markers.contains(&marker(n)) && n!=TELOMERE {
             return None;
         }
         self.adjacencies.get(n).map(|x| x.len())
     }
 
     fn adj_neighbors(&self,n:Extremity) -> Option<impl Iterator<Item=Extremity>> {
-        if self.masked_markers.contains(&marker(n)) && n!=0 {
+        if self.masked_markers.contains(&marker(n)) && n!=TELOMERE {
             return None;
         }
         self.adjacencies.get(n).map(|x| x.iter().copied())
@@ -776,7 +777,7 @@ impl RearrangementGraph for MBG {
     }
 
     fn extremities(&self) -> impl Iterator<Item=Extremity> {
-        self.markers().flat_map(|m| [tail(m),head(m)]).filter(|x| !self.masked_markers.contains(&marker(*x))).chain([0])
+        self.markers().flat_map(|m| [tail(m),head(m)]).filter(|x| !self.masked_markers.contains(&marker(*x))).chain([TELOMERE])
     }
 
     fn iter_adjacencies(&self) -> impl Iterator<Item=Adjacency> {
@@ -791,7 +792,7 @@ impl RearrangementGraph for MBG {
     }
 
     fn node_size(&self,n:Marker) -> Option<usize> {
-        if n == 0 || self.masked_markers.contains(&n) {
+        if n == TELOMERE || self.masked_markers.contains(&n) {
             return None;
         }
         self.node_sizes.get(n).copied()
@@ -803,7 +804,7 @@ impl RearrangementGraph for MBG {
     }
 
     fn num_extremities(&self) -> usize {
-       if self.degree(0).unwrap_or(0) > 0 {
+       if self.degree(TELOMERE).unwrap_or(0) > 0 {
             2*self.num_markers()+1
        } else {
             2*self.num_markers()
@@ -877,10 +878,10 @@ fn fill_telomeres(&mut self) {
     for (u,adj) in self.adjacencies.iter_mut().enumerate() {
         if u > 1 && !self.masked_markers.contains( &marker(u)) && adj.len() == 0 {
             new_telos.push(u);
-            adj.push(0);
+            adj.push(TELOMERE);
         }
     }
-    self.adjacencies[0].extend_from_slice(&new_telos);
+    self.adjacencies[TELOMERE].extend_from_slice(&new_telos);
 }
 
 fn from_unimog(path : &str) -> io::Result<MBG> {
@@ -929,17 +930,17 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
                 adjacencies[xta].push(xtb);
                 adjacencies[xtb].push(xta);
             } else if line.starts_with("|") {
-                adjacencies[0].push(xtb);
-                adjacencies[0].push(xta);
-                adjacencies[xta].push(0);
-                adjacencies[xtb].push(0);
+                adjacencies[TELOMERE].push(xtb);
+                adjacencies[TELOMERE].push(xta);
+                adjacencies[xta].push(TELOMERE);
+                adjacencies[xtb].push(TELOMERE);
             } else {
                 return Err(io::Error::new(io::ErrorKind::Other,"Invalid chromosome end."));
             }
         }
 
     }
-    Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([0])})
+    Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE])})
 }
 
 fn name_to_marker(&self,name : &str) -> Option<Marker> {
@@ -1017,8 +1018,8 @@ pub fn tail(n : Marker) -> Extremity {
 
 #[inline(always)]
 pub fn other(n : Extremity) -> Extremity{
-    if n == 0 {
-        return 0;
+    if n == TELOMERE {
+        return TELOMERE;
     }
     if is_tail(n) {
         head(marker(n))
@@ -1143,7 +1144,7 @@ mod tests {
     fn general_ubg_sanity_check(ubg: &impl RearrangementGraph) {
         //forbidden telomere thing
         assert!(ubg.degree(1).is_none());
-        if ubg.degree(0).unwrap_or(0) > 0 {
+        if ubg.degree(TELOMERE).unwrap_or(0) > 0 {
             assert_eq!(ubg.num_extremities(),ubg.num_markers()*2+1);
         } else {
             assert_eq!(ubg.num_extremities(),ubg.num_markers()*2)
@@ -1155,12 +1156,12 @@ mod tests {
         }
         let mset : HashSet<Marker> = ubg.markers().collect();
         for x in ubg.extremities() {
-            if !mset.contains(&marker(x)) && x!=0 {
+            if !mset.contains(&marker(x)) && x!=TELOMERE {
                 panic!("Extremity {x} exists, but its marker does not!");
             }
             if let Some(neighbors) = ubg.adj_neighbors(x) {
                 for y in neighbors {
-                    if !mset.contains(&marker(y)) && y!=0 {
+                    if !mset.contains(&marker(y)) && y!=TELOMERE {
                         panic!("Extremity {y} exists, but its marker does not!");
                     }
                 let mut has_x = false;
@@ -1221,15 +1222,15 @@ mod tests {
         let nd5 = ubg.name_to_marker("5").unwrap();
         let nd6 = ubg.name_to_marker("6").unwrap();
         let nd7 = ubg.name_to_marker("7").unwrap();
-        assert!(collect_neighbors(&ubg,tail(nd1)).eq(&HashSet::from([0])));
+        assert!(collect_neighbors(&ubg,tail(nd1)).eq(&HashSet::from([TELOMERE])));
         assert!(collect_neighbors(&ubg,head(nd1)).eq(&HashSet::from([head(nd2),tail(nd6)])));
         assert!(collect_neighbors(&ubg,head(nd2)).eq(&HashSet::from([head(nd1)])));
         assert!(collect_neighbors(&ubg,tail(nd2)).eq(&HashSet::from([tail(nd5)])));
         assert!(collect_neighbors(&ubg,tail(nd5)).eq(&HashSet::from([tail(nd2)])));
-        assert!(collect_neighbors(&ubg,head(nd5)).eq(&HashSet::from([0])));
+        assert!(collect_neighbors(&ubg,head(nd5)).eq(&HashSet::from([TELOMERE])));
         assert!(collect_neighbors(&ubg,tail(nd7)).eq(&HashSet::from([head(nd7)])));
         assert!(collect_neighbors(&ubg,tail(nd6)).eq(&HashSet::from([head(nd1)])));
-        assert!(collect_neighbors(&ubg,head(nd6)).eq(&HashSet::from([0])));
+        assert!(collect_neighbors(&ubg,head(nd6)).eq(&HashSet::from([TELOMERE])));
     }
 
 
@@ -1250,8 +1251,8 @@ mod tests {
         nids.insert(String::from("A"), 1);
         sizes.insert(1,1);
         adj.insert(head(1),HashSet::from([head(1)]));
-        adj.insert(tail(1), HashSet::from([0]));
-        adj.insert(0, HashSet::from([tail(1)]));
+        adj.insert(tail(1), HashSet::from([TELOMERE]));
+        adj.insert(TELOMERE, HashSet::from([tail(1)]));
         let g = T::from_hash_maps(sizes, adj, nids);
         let (a,b) = calc_carp_measure_multithread(&g, 1);
         let mut aexp = Vec::new();
@@ -1263,7 +1264,7 @@ mod tests {
     fn test_read_gfa_path() {
         let mut mbg = MBG::from_gfa("testfiles/test08.gfa").unwrap();
         general_ubg_sanity_check(&mbg);
-        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
         let m1 = mbg.name_to_marker(&"1").unwrap();
         let m2 = mbg.name_to_marker(&"2").unwrap();
@@ -1274,12 +1275,12 @@ mod tests {
         general_ubg_sanity_check(&mbg);
         let m1nb : HashSet<Extremity> = mbg.adj_neighbors(head(m1)).unwrap().collect();
         let mut expectnb = HashSet::new();
-        expectnb.insert(0);
+        expectnb.insert(TELOMERE);
         expectnb.insert(head(m1));
         assert_eq!(m1nb,expectnb);
         mbg.trim_multithread(4, 10);
         assert_eq!(mbg.num_extremities(),0);
-        assert_eq!(mbg.adj_neighbors(0).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
+        assert_eq!(mbg.adj_neighbors(TELOMERE).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
     }
 
 
@@ -1287,7 +1288,7 @@ mod tests {
     fn test_read_gfa_walk() {
         let mut mbg = MBG::from_gfa("testfiles/test10.gfa").unwrap();
         general_ubg_sanity_check(&mbg);
-        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
         let m1 = mbg.name_to_marker(&"1").unwrap();
         let m2 = mbg.name_to_marker(&"2").unwrap();
@@ -1298,12 +1299,12 @@ mod tests {
         general_ubg_sanity_check(&mbg);
         let m1nb : HashSet<Extremity> = mbg.adj_neighbors(head(m1)).unwrap().collect();
         let mut expectnb = HashSet::new();
-        expectnb.insert(0);
+        expectnb.insert(TELOMERE);
         expectnb.insert(head(m1));
         assert_eq!(m1nb,expectnb);
         mbg.trim_multithread(4, 10);
         assert_eq!(mbg.num_extremities(),0);
-        assert_eq!(mbg.adj_neighbors(0).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
+        assert_eq!(mbg.adj_neighbors(TELOMERE).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
     }
 
 
@@ -1311,7 +1312,7 @@ mod tests {
     fn test_read_gfa_path_single() {
         let mbg = MBG::from_gfa("testfiles/test09.gfa").unwrap();
         general_ubg_sanity_check(&mbg);
-        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
         let m1 = mbg.name_to_marker(&"1").unwrap();
         expect.insert(head(m1));
@@ -1324,7 +1325,7 @@ mod tests {
     fn test_read_gfa_walk_single() {
         let mbg = MBG::from_gfa("testfiles/test11.gfa").unwrap();
         general_ubg_sanity_check(&mbg);
-        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
         let m1 = mbg.name_to_marker(&"1").unwrap();
         expect.insert(head(m1));
@@ -1417,7 +1418,7 @@ mod tests {
         assert!(h1n.eq(&HashSet::from([tail(2)])));
         let t2n : HashSet<Extremity> = ubg.adj_neighbors(tail(2)).unwrap().collect();
         assert!(t2n.eq(&HashSet::from([tail(1)])));
-        let ttn : HashSet<Extremity> = ubg.adj_neighbors(0).unwrap().collect();
+        let ttn : HashSet<Extremity> = ubg.adj_neighbors(TELOMERE).unwrap().collect();
         assert!(ttn.eq(&HashSet::from([head(1),head(2)])));
     }
 
@@ -1481,12 +1482,12 @@ mod tests {
         for (x,y) in contested {
             assert!(ubg.adj_neighbors(*x).unwrap().collect::<Vec<_>>().len()>1 
                 || ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()>1 || *x==*y);
-            assert!(*x!=0 && *y!=0);
+            assert!(*x!=TELOMERE && *y!=TELOMERE);
         }
         for (x,y) in uncontested {
             assert!((ubg.adj_neighbors(*x).unwrap().collect::<Vec<_>>().len()==1 
                 && ubg.adj_neighbors(*y).unwrap().collect::<Vec<_>>().len()==1 && *x!=*y)
-                || *x==0 || *y==0);
+                || *x==TELOMERE || *y==TELOMERE);
             assert!(ubg.adj_neighbors(*x).unwrap().collect::<HashSet<_>>().contains(y)
                 && ubg.adj_neighbors(*y).unwrap().collect::<HashSet<_>>().contains(x))
         }
@@ -1645,8 +1646,8 @@ mod tests {
             (tail(m5),tail(m10)),
             (head(m9),tail(m10)),
             (tail(m9),tail(m8)),
-            (head(m6),0),
-            (head(m8),0)
+            (head(m6),TELOMERE),
+            (head(m8),TELOMERE)
         ].iter().map(|x| canonicize(*x)).collect();
         assert_eq!(adj,expect);
 
@@ -1658,7 +1659,7 @@ mod tests {
             (tail(m5),tail(m10)),
             (head(m9),tail(m10)),
             (tail(m9),tail(m8)),
-            (head(m8),0)
+            (head(m8),TELOMERE)
         ].iter().map(|x| canonicize(*x)).collect();
         assert_eq!(adj,expect);
 
@@ -1668,7 +1669,7 @@ mod tests {
         let expect : HashSet<Adjacency> = [
             (head(m7),tail(m8)),
             (tail(m9),tail(m8)),
-            (head(m8),0)
+            (head(m8),TELOMERE)
         ].iter().map(|x| canonicize(*x)).collect();
         assert_eq!(adj,expect);
 
@@ -1678,7 +1679,7 @@ mod tests {
         let expect : HashSet<Adjacency> = [
             (head(m7),tail(m8)),
             (tail(m9),tail(m8)),
-            (head(m8),0),
+            (head(m8),TELOMERE),
             (tail(m7),tail(m6)),
             (head(m9),tail(m10))
         ].iter().map(|x| canonicize(*x)).collect();
@@ -1689,11 +1690,11 @@ mod tests {
         let expect : HashSet<Adjacency> = [
             (head(m7),tail(m8)),
             (tail(m9),tail(m8)),
-            (head(m8),0),
+            (head(m8),TELOMERE),
             (tail(m7),tail(m6)),
             (head(m9),tail(m10)),
             (head(m5),head(m10)),
-            (head(m6),0)
+            (head(m6),TELOMERE)
         ].iter().map(|x| canonicize(*x)).collect();
         assert_eq!(adj,expect);
 
@@ -1702,11 +1703,11 @@ mod tests {
         let expect : HashSet<Adjacency> = [
             (head(m7),tail(m8)),
             (tail(m9),tail(m8)),
-            (head(m8),0),
+            (head(m8),TELOMERE),
             (tail(m7),tail(m6)),
             (head(m9),tail(m10)),
             (head(m5),head(m10)),
-            (head(m6),0),
+            (head(m6),TELOMERE),
             (tail(5),tail(10))
         ].iter().map(|x| canonicize(*x)).collect();
         assert_eq!(adj,expect);
@@ -1773,7 +1774,7 @@ pub fn adjacency_neighborhood(m : Marker,max_depth : usize, graph : &impl Rearra
                         (neigbor,position)
                     };
                 adjacencies.insert(adj);
-                if neigbor == 0 {
+                if neigbor == TELOMERE {
                     //skip telomeres, they're not real connections
                     continue;
                 }
@@ -1841,7 +1842,7 @@ pub fn carp_measure_from_adjacencies(adjacencies : &HashSet<Adjacency>) -> usize
         *yv+=1;
     }
     for (x,y) in adjacencies {
-        if (*degrees.get(x).unwrap() > 1 || *degrees.get(y).unwrap() > 1) && !(*x== 0) && !(*y == 0) {
+        if (*degrees.get(x).unwrap() > 1 || *degrees.get(y).unwrap() > 1) && !(*x== TELOMERE) && !(*y == TELOMERE) {
             carp_measure+=1;
         }
     }
@@ -1855,12 +1856,12 @@ fn check_add_tel(ubg : &mut UBG, n : Extremity) {
     };
     let neighbors= ubg.adjacencies.get_mut(&n).expect("Just inserted value disappeared");
     if neighbors.is_empty() {
-        neighbors.insert(0);
-        match ubg.adjacencies.get(&0) {
-            None => ubg.adjacencies.insert(0, HashSet::new()),
+        neighbors.insert(TELOMERE);
+        match ubg.adjacencies.get(&TELOMERE) {
+            None => ubg.adjacencies.insert(TELOMERE, HashSet::new()),
             Some(_) => None
         };
-        ubg.adjacencies.get_mut(&0).expect("test").insert(n);
+        ubg.adjacencies.get_mut(&TELOMERE).expect("test").insert(n);
     }
     
 }
@@ -1975,7 +1976,7 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
                         contested.push(canonicize((*x,y)));
                     }
                     self_seen=true;
-                } else if *x==0 || y==0 {
+                } else if *x==TELOMERE || y==TELOMERE {
                     uncontested.push(canonicize((*x,y)));
                 } else if degx > 1 || degy > 1 {
                     contested.push(canonicize((*x,y)));
