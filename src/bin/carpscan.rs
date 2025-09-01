@@ -10,7 +10,7 @@ const ONE_MILLION :usize = 1000000;
 fn scan_partial(graph : &impl RearrangementGraph, max_depth :usize , markers : &[usize],thread_num : usize) -> HashMap<Marker,usize> {
     let mut node_complexities = HashMap::new();
     let tot_size = markers.len();
-    let about_ten_percent = (markers.len()/100 +1);//.max(10000);
+    let about_ten_percent = (markers.len()/100 +1).max(10000);
     //eprintln!("Thread {thread_num}: {about_ten_percent}");
     let mut i = 0;
     for m in markers {

@@ -2,43 +2,15 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fs::File;
 use std::hash::Hash;
 use std::io::{self, BufRead, BufReader};
-use std::time::Duration;
 use csv::{ReaderBuilder,Reader};
 use std::cmp::Ordering;
-use std::thread::{self, sleep};
+use std::thread;
 use flate2::read::MultiGzDecoder;
 use itertools::Itertools;
 
 
 const ONE_MILLION :usize = 1000000;
 const LEN_PREFIX  : &str = "LN:i:";
-
-pub const CARP_LOGO_O : &str = 
-"'kl               You're running SCJ CARP
-XMM.                        Version 0.0.1
-.MMW.                                    
- MMd                                     
- XM.         Feel free to report bugs at:
- lK      github.com/gi-bielefeld/scj-carp
- .Mx                                     
- .MMO.                                   
-  MMMXc.                                 
-  KMMMMM0l.                              
-  .WMMMMMMM0l.                           
-   :MMMMMMMMMM0c.                        
-    ;WMMMMMMMMMMMXd;                     
-     'NMMMMMMMMMMMMMWOl.                 
-      .XMMMMMMMMMMMMMMMMXc               
-       .xMMMMMMMMMMMMMMMMMXc             
-         ,NMMMMMMMMMMMMMKkxOXO:          
-          'NMMMMMMMMMMX,....'NMK'        
-        .KMMMMMMMMMMMMN:...,dMMMW'       
-        :MMMMMMMMMMMMMMMNXNMMMMMMW.      
-         ,okOOo'.;kWMMMMMMMMMMMMMMN.     
-                .ckNWNMMMMMMMMMMMMk,.    
-             .dOxc,.  .:dxkO0XNNo.       
-            ''.                ;         
-";
 
 pub const CARP_LOGO : &str = 
 "   oo.              You're running SCJ CARP
@@ -177,6 +149,11 @@ impl RearrangementGraph for UBG  {
         //remove any accidentally created self loops of the telomere
         if let Some(tladj) = self.adjacencies.get_mut(&0) {
             tladj.remove(&0);
+        }
+
+        //remove the telomere if it's empty
+        if self.degree(0).unwrap_or(0) == 0 {
+            self.adjacencies.remove(&0);
         }
     }
     
@@ -512,7 +489,7 @@ impl MBG {
         let mut curr_id = 1;
         let mut i :usize = 0;
         let mut n_edges :usize = 0;
-        let mut telomeres : Vec<(String,bool)> = Vec::new();
+        let mut telomeres : HashSet<(String,bool)> = HashSet::new();
         let mut seen_edges = HashSet::new();
         for res in rdr.records() {
             let x = res?;
@@ -581,7 +558,7 @@ impl MBG {
                 if !seen_edges.contains(&cane) {
                     adjacencies.get_mut(axtr).unwrap().push(bxtr);
                     adjacencies.get_mut(bxtr).unwrap().push(axtr);
-                     n_edges+=1;
+                    n_edges+=1;
                     seen_edges.insert(cane);
                 }
                 
@@ -589,34 +566,42 @@ impl MBG {
                 let pname = x.get(1).expect("Path does not have a name identifier.");
                 let mut path = x.get(2).expect(&format!("Path '{pname}' missing mandatory gfa field 3.")).split(|x : char| {x==',' || x==';'});
                 let fst = path.nth(0);
-                let lst = path.last();
-                let parse_pend = |x : &str,is_telomere_end : bool| {
+                //let lst = path.last();
+                let lst = match path.last() {
+                    Some(a) => Some(a),
+                    None => fst
+                };
+                let parse_pend = |x : &str,is_path_end : bool| {
                     let x = x.strip_suffix("\n").unwrap_or(x);
                     assert!(x.ends_with("+") || x.ends_with("-"));
                     let mut xp = x.to_owned();
                     xp.pop();
-                    let xtr_is_tail = is_telomere_end == x.ends_with("+");
+                    let xtr_is_tail = is_path_end == x.ends_with("-");
                     (xp,xtr_is_tail)};
                 match (fst,lst) {
                     (Some(f),Some(l)) => {
-                    telomeres.push(parse_pend(f,false));
+                    telomeres.insert(parse_pend(f,false));
+                    telomeres.insert(parse_pend(l,true));
                     },
                     (_,_) => continue
                 }
             } else if entrytype == "W" {
                 let wlk = x.get(6).expect("Walk line without walk");
                 let pat = |x : char| {x=='>' || x=='<'};
-                let end = wlk.find(pat);
-                let strt = wlk.rfind(pat);
+                let start = wlk.find(pat);
+                let end = wlk.rfind(pat);
                 let mut wlki = wlk[1..].split(pat);
                 let fst = wlki.nth(0);
-                let lst = wlki.last();
+                let lst = match wlki.last() {
+                    Some(a) => Some(a),
+                    None => fst
+                };
                 match (fst,lst) {
                     (Some(f),Some(l)) => {
                     let e_is_tail = wlk.as_bytes()[end.unwrap()] as char == '<';
-                    let s_is_tail = wlk.as_bytes()[strt.unwrap()] as char == '>';
-                    telomeres.push((f.to_owned(),s_is_tail));
-                    telomeres.push((l.to_owned(),e_is_tail));
+                    let s_is_tail = wlk.as_bytes()[start.unwrap()] as char == '>';
+                    telomeres.insert((f.to_owned(),s_is_tail));
+                    telomeres.insert((l.to_owned(),e_is_tail));
                     },
                     (_,_) => continue
                 }
@@ -1158,18 +1143,18 @@ mod tests {
     fn general_ubg_sanity_check(ubg: &impl RearrangementGraph) {
         //forbidden telomere thing
         assert!(ubg.degree(1).is_none());
-        let mp = ubg.marker_names();
+        if ubg.degree(0).unwrap_or(0) > 0 {
+            assert_eq!(ubg.num_extremities(),ubg.num_markers()*2+1);
+        } else {
+            assert_eq!(ubg.num_extremities(),ubg.num_markers()*2)
+        }
+        
         for m in ubg.markers() {
-            //println!("Testing marker: {m}");
-            if let Some(name) = mp.get(&m) {
-                //println!("Aka {name}")
-            }
             assert!(ubg.degree(tail(m)).is_some());
             assert!(ubg.degree(head(m)).is_some());
         }
         let mset : HashSet<Marker> = ubg.markers().collect();
         for x in ubg.extremities() {
-            //eprintln!("Testing extremity of {}",marker(x));
             if !mset.contains(&marker(x)) && x!=0 {
                 panic!("Extremity {x} exists, but its marker does not!");
             }
@@ -1267,13 +1252,85 @@ mod tests {
         adj.insert(head(1),HashSet::from([head(1)]));
         adj.insert(tail(1), HashSet::from([0]));
         adj.insert(0, HashSet::from([tail(1)]));
-        let mut g = T::from_hash_maps(sizes, adj, nids);
+        let g = T::from_hash_maps(sizes, adj, nids);
         let (a,b) = calc_carp_measure_multithread(&g, 1);
         let mut aexp = Vec::new();
         aexp.push((head(1),head(1)));
         assert_eq!(a,aexp);
     }
 
+    #[test]
+    fn test_read_gfa_path() {
+        let mut mbg = MBG::from_gfa("testfiles/test08.gfa").unwrap();
+        general_ubg_sanity_check(&mbg);
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let mut expect : HashSet<Extremity> = HashSet::new();
+        let m1 = mbg.name_to_marker(&"1").unwrap();
+        let m2 = mbg.name_to_marker(&"2").unwrap();
+        expect.insert(tail(m1));
+        expect.insert(tail(m2));
+        assert_eq!(tels,expect);
+        mbg.trim_multithread(2, 3);
+        general_ubg_sanity_check(&mbg);
+        let m1nb : HashSet<Extremity> = mbg.adj_neighbors(head(m1)).unwrap().collect();
+        let mut expectnb = HashSet::new();
+        expectnb.insert(0);
+        expectnb.insert(head(m1));
+        assert_eq!(m1nb,expectnb);
+        mbg.trim_multithread(4, 10);
+        assert_eq!(mbg.num_extremities(),0);
+        assert_eq!(mbg.adj_neighbors(0).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
+    }
+
+
+    #[test]
+    fn test_read_gfa_walk() {
+        let mut mbg = MBG::from_gfa("testfiles/test10.gfa").unwrap();
+        general_ubg_sanity_check(&mbg);
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let mut expect : HashSet<Extremity> = HashSet::new();
+        let m1 = mbg.name_to_marker(&"1").unwrap();
+        let m2 = mbg.name_to_marker(&"2").unwrap();
+        expect.insert(tail(m1));
+        expect.insert(tail(m2));
+        assert_eq!(tels,expect);
+        mbg.trim_multithread(2, 3);
+        general_ubg_sanity_check(&mbg);
+        let m1nb : HashSet<Extremity> = mbg.adj_neighbors(head(m1)).unwrap().collect();
+        let mut expectnb = HashSet::new();
+        expectnb.insert(0);
+        expectnb.insert(head(m1));
+        assert_eq!(m1nb,expectnb);
+        mbg.trim_multithread(4, 10);
+        assert_eq!(mbg.num_extremities(),0);
+        assert_eq!(mbg.adj_neighbors(0).map(|x| x.collect()).unwrap_or(HashSet::new()),HashSet::new());
+    }
+
+
+    #[test]
+    fn test_read_gfa_path_single() {
+        let mbg = MBG::from_gfa("testfiles/test09.gfa").unwrap();
+        general_ubg_sanity_check(&mbg);
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let mut expect : HashSet<Extremity> = HashSet::new();
+        let m1 = mbg.name_to_marker(&"1").unwrap();
+        expect.insert(head(m1));
+        expect.insert(tail(m1));
+        assert_eq!(tels,expect);
+    }
+
+
+    #[test]
+    fn test_read_gfa_walk_single() {
+        let mbg = MBG::from_gfa("testfiles/test11.gfa").unwrap();
+        general_ubg_sanity_check(&mbg);
+        let tels : HashSet<Extremity> = mbg.adj_neighbors(0).unwrap().collect();
+        let mut expect : HashSet<Extremity> = HashSet::new();
+        let m1 = mbg.name_to_marker(&"1").unwrap();
+        expect.insert(head(m1));
+        expect.insert(tail(m1));
+        assert_eq!(tels,expect);
+    }
 
     #[test]
     fn test_random_gfa() {
@@ -1305,7 +1362,7 @@ mod tests {
                 general_ubg_sanity_check(&mbg_);
                 eprintln!("Eq check");
                 equivalence_check(&ubg_, &mbg_);
-                for i in 2..8 {
+                for i in 3..5 {
                     let mut mbg_mtt = mbg.clone();
                     mbg_mtt.trim_multithread(flt, i);
                     general_ubg_sanity_check(&mbg_mtt);
@@ -1524,6 +1581,136 @@ mod tests {
         mbg.trim_multithread(ONE_MILLION,2);
         general_ubg_sanity_check(&mbg);
     }
+
+
+
+
+
+    #[test]
+    fn test_scan() {
+        let mut mbg = MBG::from_gfa("testfiles/test12.gfa").unwrap();
+        mbg.fill_telomeres();
+        general_ubg_sanity_check(&mbg);
+        let m1 = mbg.name_to_marker("1").unwrap();
+        let m2 = mbg.name_to_marker("2").unwrap();
+        let m3 = mbg.name_to_marker("3").unwrap();
+        let m4 = mbg.name_to_marker("4").unwrap();
+        let m5 = mbg.name_to_marker("5").unwrap();
+        let m6 = mbg.name_to_marker("6").unwrap();
+        let m7 = mbg.name_to_marker("7").unwrap();
+        let m8 = mbg.name_to_marker("8").unwrap();
+        let m9 = mbg.name_to_marker("9").unwrap();
+        let m10 = mbg.name_to_marker("10").unwrap();
+
+        //Test for emptiness
+        let adj = adjacency_neighborhood(m2,24,&mbg);
+        assert_eq!(adj,HashSet::new());
+
+
+        //Test emptiness for self loops
+        let adj = adjacency_neighborhood(m1,24,&mbg);
+        assert_eq!(adj,HashSet::new());
+
+        //Test complete component
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m2,500,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m2),tail(m4)),
+            (head(m4),head(m2)),
+            (head(m1),tail(m2)),
+            (tail(m1),tail(m1)),
+            (head(m3),tail(m1)),
+            (tail(m3),tail(m3)),
+            (tail(m3),tail(m2)),
+            
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+
+        //Test cutoff
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m2,100,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m2),tail(m4)),
+            (head(m4),head(m2)),
+            (head(m1),tail(m2)),
+            (tail(m3),tail(m2))
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+
+        //Test no parallel
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m5,1500,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m5),tail(m6)),
+            (head(m5),head(m10)),
+            (tail(m5),tail(m10)),
+            (head(m9),tail(m10)),
+            (tail(m9),tail(m8)),
+            (head(m6),0),
+            (head(m8),0)
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+
+        //Test directed in
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m9,1500,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m5),head(m10)),
+            (tail(m5),tail(m10)),
+            (head(m9),tail(m10)),
+            (tail(m9),tail(m8)),
+            (head(m8),0)
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+
+        //Test shortened
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m8,200,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m7),tail(m8)),
+            (tail(m9),tail(m8)),
+            (head(m8),0)
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+
+        //Test shortened
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m8,400,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m7),tail(m8)),
+            (tail(m9),tail(m8)),
+            (head(m8),0),
+            (tail(m7),tail(m6)),
+            (head(m9),tail(m10))
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+        //Test shortened
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m8,650,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m7),tail(m8)),
+            (tail(m9),tail(m8)),
+            (head(m8),0),
+            (tail(m7),tail(m6)),
+            (head(m9),tail(m10)),
+            (head(m5),head(m10)),
+            (head(m6),0)
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+
+        //Test shortened
+        let adj : HashSet<Adjacency> = adjacency_neighborhood(m8,691,&mbg).iter().map(|x| canonicize(*x)).collect();
+        let expect : HashSet<Adjacency> = [
+            (head(m7),tail(m8)),
+            (tail(m9),tail(m8)),
+            (head(m8),0),
+            (tail(m7),tail(m6)),
+            (head(m9),tail(m10)),
+            (head(m5),head(m10)),
+            (head(m6),0),
+            (tail(5),tail(10))
+        ].iter().map(|x| canonicize(*x)).collect();
+        assert_eq!(adj,expect);
+    }
 }
 
 
@@ -1580,17 +1767,19 @@ pub fn adjacency_neighborhood(m : Marker,max_depth : usize, graph : &impl Rearra
     while let Some(State {cost, position}) = visited.pop(){
         if let Some(neighbors) = graph.adj_neighbors(position) {
             for neigbor in neighbors {
+                let adj = if position < neigbor {
+                        (position,neigbor)  
+                    } else {
+                        (neigbor,position)
+                    };
+                adjacencies.insert(adj);
                 if neigbor == 0 {
                     //skip telomeres, they're not real connections
                     continue;
                 }
                 let oend = other(neigbor);
-                let adj = if position < neigbor {
-                  (position,neigbor)  
-                } else {
-                    (neigbor,position)
-                };
-                adjacencies.insert(adj);
+                
+                
                 let ndist: usize = cost + graph.node_size(marker(neigbor)).unwrap_or(1);//.node_sizes.get(&marker(*neigbor)).unwrap_or(&1);
                 if ndist <= max_depth && *min_dist.get(&oend).unwrap_or(&(ndist+1)) > ndist {
                     visited.push(State{cost: ndist,position: oend});
@@ -1664,13 +1853,13 @@ fn check_add_tel(ubg : &mut UBG, n : Extremity) {
         None => ubg.adjacencies.insert(n, HashSet::new()),
         Some(_) => None
     };
-    match ubg.adjacencies.get(&0) {
-        None => ubg.adjacencies.insert(0, HashSet::new()),
-        Some(_) => None
-    };
     let neighbors= ubg.adjacencies.get_mut(&n).expect("Just inserted value disappeared");
     if neighbors.is_empty() {
         neighbors.insert(0);
+        match ubg.adjacencies.get(&0) {
+            None => ubg.adjacencies.insert(0, HashSet::new()),
+            Some(_) => None
+        };
         ubg.adjacencies.get_mut(&0).expect("test").insert(n);
     }
     
@@ -1768,7 +1957,7 @@ where
     dups
 }
 
-pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Extremity],threadnum: usize) -> (Vec<Adjacency>,Vec<Adjacency>) {
+pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Extremity],_threadnum: usize) -> (Vec<Adjacency>,Vec<Adjacency>) {
     let mut contested = Vec::new();
     let mut uncontested = Vec::new();
     for x in extremities {
@@ -1790,7 +1979,6 @@ pub fn calc_partial_measure(graph : &impl RearrangementGraph, extremities : &[Ex
                     uncontested.push(canonicize((*x,y)));
                 } else if degx > 1 || degy > 1 {
                     contested.push(canonicize((*x,y)));
-                    //eprintln!("pushing {x} {y}");
                 } else {
                     uncontested.push(canonicize((*x,y)));
                 }
