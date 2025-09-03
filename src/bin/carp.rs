@@ -40,8 +40,8 @@ fn main() {
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     println!("Adding telomeres to complete graph.");
     graph.fill_telomeres();
-    println!("Trimming graph.");
     if thresh > 0 {
+        println!("Trimming graph.");
         graph.trim_multithread(thresh,threads);
         graph.fill_telomeres();
     }

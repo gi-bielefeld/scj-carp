@@ -94,13 +94,7 @@ impl MBG {
         self.masked_markers.insert(m); 
     }
 
-    fn fill_up_vec<T>(adj : &mut Vec<T>, to : usize)
-    where T: std::default::Default
-     {
-        for _ in adj.len()..(to+1) {
-            adj.push(T::default());
-        }
-    }
+    
     
     
     fn find_solid_neighbors(&self, start : Extremity, size_threshold : usize) -> HashSet<Extremity> {
@@ -131,7 +125,7 @@ impl MBG {
     where 
         R : std::io::Read
     {
-        eprintln!("Read gfa.");
+        //eprintln!("Read gfa.");
         let mut node_sizes = Vec::new();
         let mut adjacencies : Vec<Vec<Extremity>> = Vec::new(); 
         let mut node_ids: HashMap<String, Marker>   = HashMap::new();
@@ -173,7 +167,7 @@ impl MBG {
                 let n_id;
                 (curr_id,n_id) = get_or_set_node_id(&mut node_ids, curr_id, seg_name);
                 if n_id >= node_sizes.len() {
-                    Self::fill_up_vec(&mut node_sizes, n_id);
+                    fill_up_vec(&mut node_sizes, n_id);
                 }
                 node_sizes[n_id] = seg_len;
                 
@@ -196,10 +190,10 @@ impl MBG {
                     (_,_) => return Err(io::Error::new(io::ErrorKind::Other,"Malformed link."))
                 };
                 if adjacencies.len() <= axtr {
-                    Self::fill_up_vec(&mut adjacencies, axtr);
+                    fill_up_vec(&mut adjacencies, axtr);
                 }
                 if adjacencies.len() <= bxtr {
-                    Self::fill_up_vec(&mut adjacencies, bxtr);
+                    fill_up_vec(&mut adjacencies, bxtr);
                 }
                 //adjacencies.get_mut(&axtr).expect("Horror").insert(bxtr);
                 //adjacencies.get_mut(&bxtr).expect("Horror").insert(axtr);
@@ -266,7 +260,7 @@ impl MBG {
                 head(m)
             };
             if adjacencies.len() <= xtr {
-                    Self::fill_up_vec(&mut adjacencies, xtr);
+                    fill_up_vec(&mut adjacencies, xtr);
             }
             adjacencies.get_mut(xtr).unwrap().push(TELOMERE);
             adjacencies.get_mut(TELOMERE).unwrap().push(xtr);
@@ -522,7 +516,7 @@ fn fill_telomeres(&mut self) {
     let mut new_telos = Vec::new();
     let mmax = self.markers().filter(|x| !self.masked_markers.contains(x)).max().unwrap_or(0);
     let hmax = head(mmax);
-    Self::fill_up_vec(&mut self.adjacencies, hmax);
+    fill_up_vec(&mut self.adjacencies, hmax);
     for (u,adj) in self.adjacencies.iter_mut().enumerate() {
         if u > 1 && !self.masked_markers.contains( &marker(u)) && adj.len() == 0 {
             new_telos.push(u);
@@ -539,6 +533,7 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut curr_id = 1;
+    let mut seen_edges = HashSet::new();
     for line in reader.lines() {
         let line  = &line?;
         if line.starts_with(&">") {
@@ -560,9 +555,8 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
             }
             if let Some(last) = last {
                 let (xta,xtb) = to_adjacency(last,(is_forward,marker));
-                Self::fill_up_vec(&mut adjacencies, xta.max(xtb));
-                adjacencies[xta].push(xtb);
-                adjacencies[xtb].push(xta);
+                let canone = canonicize((xta,xtb));
+                insert_adj(&mut adjacencies, &mut seen_edges, canone);   
             }
             line = &line[j+1..];
             last = Some((is_forward,marker));
@@ -573,15 +567,18 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
         if let Some((ifa,ma)) = last {
             let (ifb,mb) = first.expect("If a last marker exists, there must be a first marker");
             let (xta,xtb) = to_adjacency((ifa,ma),(ifb,mb));
-            Self::fill_up_vec(&mut adjacencies, xta.max(xtb));
+            fill_up_vec(&mut adjacencies, xta.max(xtb));
             if line.starts_with(")") {
-                adjacencies[xta].push(xtb);
-                adjacencies[xtb].push(xta);
+                //adjacencies[xta].push(xtb);
+                //adjacencies[xtb].push(xta);
+                insert_adj(&mut adjacencies, &mut seen_edges, (xta,xtb));
             } else if line.starts_with("|") {
-                adjacencies[TELOMERE].push(xtb);
-                adjacencies[TELOMERE].push(xta);
-                adjacencies[xta].push(TELOMERE);
-                adjacencies[xtb].push(TELOMERE);
+                //adjacencies[TELOMERE].push(xtb);
+                //adjacencies[TELOMERE].push(xta);
+                //adjacencies[xta].push(TELOMERE);
+                //adjacencies[xtb].push(TELOMERE);
+                insert_adj(&mut adjacencies, &mut seen_edges, (TELOMERE,xta));
+                insert_adj(&mut adjacencies, &mut seen_edges, (TELOMERE,xtb));
             } else {
                 return Err(io::Error::new(io::ErrorKind::Other,"Invalid chromosome end."));
             }
@@ -644,6 +641,24 @@ fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
     
 }
 
+#[inline(always)]
+fn insert_adj(adjacencies: &mut Vec<Vec<usize>>, seen_edges: &mut HashSet<(usize, usize)>, adj: Adjacency) {
+    let canonic_adj = canonicize(adj);
+    let (xta,xtb) = canonic_adj;
+    if !seen_edges.contains(&canonic_adj) {
+        fill_up_vec(adjacencies, xta.max(xtb));
+        adjacencies[xta].push(xtb);
+        adjacencies[xtb].push(xta);
+        seen_edges.insert(canonic_adj);
+    }
+}
 
 
+fn fill_up_vec<T>(adj : &mut Vec<T>, to : usize)
+    where T: std::default::Default
+     {
+        for _ in adj.len()..(to+1) {
+            adj.push(T::default());
+        }
+    }
 

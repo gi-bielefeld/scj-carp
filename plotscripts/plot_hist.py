@@ -68,7 +68,7 @@ if args.color_ns:
 
 curr_t = list(range(5000,38000,5000))
 curr_l = curr_t
-plt.xticks(curr_t+[100,500,1500,35000],labels=curr_l+["A","B","C","D"])
+#plt.xticks(curr_t+[100,500,1500,35000],labels=curr_l+["A","B","C","D"])
 plt.xlabel(args.xlabel)
 plt.ylabel("Number of Nodes")
 #plt.yscale("log")

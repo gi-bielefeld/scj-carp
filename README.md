@@ -9,16 +9,15 @@ The resulting binaries (`carp`,`carpscan`,`extract`) are then found in `./target
 ## How to run
 
 
-All binaries need to be run with either `--gfa <your-file> ` to read `<your-file>` in [gfa format](https://gfa-spec.github.io/GFA-spec/GFA1.html) or with `--unimog <your-file> ` to read `<your-file>` in [unimog format](https://bibiserv.cebitec.uni-bielefeld.de/dcj).
+All binaries need to be run with either `--gfa <your-file> ` to read `<your-file>` in [gfa format](https://github.com/GFA-spec/GFA-spec/blob/master/GFA1.md) or with `--unimog <your-file> ` to read `<your-file>` in [unimog format](https://bibiserv.cebitec.uni-bielefeld.de/dcj).
 
-Currently we do not support the inferrence of telomeres from paths in gfa files. This may lead to small differences in the CARP measure.
 
 Optionally the binaries support the following parameters:
 
 | Parameter | Behavior |
 | ------ | ------ |
 | `-s`/`--size-thresh <st>`| Filter out all nodes smaller than `<st>`. Note: Since unimog files do not support node lengths, this will filter all nodes in a graph from a unimog file |
-| `-t`/`--num-threads <t>`       | Use `<t>` threads for the main computation of the program. This currently does not apply to file reading or graph timming.       |
+| `-t`/`--num-threads <t>`       | Use `<t>` threads for the main computation of the program. This currently does not apply to file reading.       |
 | `-h`/`--help`       | Displays a help text for the given program |
 
 ### `carp`
