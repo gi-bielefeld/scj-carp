@@ -1,0 +1,35 @@
+
+
+INPUT = 'genome.gfa'
+
+OUTPUT_DIR = './output/s'
+
+CONTEXTS = [500,1000,1500,2000,2500,3000,3500,4000]
+
+
+rule all_histogram:
+    input:
+        expand(OUTPUT_DIR+"hist/scan_c{clen}.hist",clen=CONTEXTS)
+
+rule calc_scan:
+    input:
+        genome=INPUT,
+        binary="../../target/release/carpscan"
+    output:
+        OUTPUT_DIR+"hist/scan_c{clen}.hist"
+    threads:
+        8
+    log:
+         std=OUTPUT_DIR+"logs/scan_c{clen}.log",
+         err=OUTPUT_DIR+"logs/scan_c{clen}.errlog"
+    benchmark:
+        OUTPUT_DIR+"bench/scan_c{clen}.txt"
+    shell:
+        '{input.binary} --gfa {input.genome} -t {threads} --lower-percentile 1.0 --output-histogram {output} -c {wildcards.clen} > {log.std} 2> {log.err}'
+
+        
+rule compile:
+    output:
+        "../../target/release/carpscan"
+    shell:
+        "cd ..; cargo build --release"

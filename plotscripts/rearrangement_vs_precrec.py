@@ -12,7 +12,7 @@ get_f1 = lambda e: 2*float(e[1])*float(e[2])/(float(e[1])+float(e[2]))
 X = 0
 YS = ['prec','recall']#,'f1']
 YFUN = [get_precision,get_recall]#,get_f1]
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 20})
 
 
 
@@ -49,6 +49,7 @@ for y in YS:
 
 
 plt.legend([mp.Patch(color=colors[0]),mp.Patch(color=colors[1])],['Precision','Recall'],loc=3)
-plt.xticks([i/10 for i in range(1,11)])
+plt.xticks([i/10 for i in range(1,11,3)])
+plt.yticks([i/10 for i in range(4,11,2)])
 plt.xlabel("Rearrangement Scale")
 plt.show()

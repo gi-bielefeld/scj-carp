@@ -1,49 +1,70 @@
 # SCJ-CARP
+![CARP LOGO](carptrace_plain.svg)
+## How to build
 
-SCJ-CARP is a prototype solving CARP, an ancestral reconstruction problem for pangenomes, under the SCJ-model.
-SCJ-CARP allows to calculate the SCJ-CARP measure, an index of pangenome structural complexity.
+`cargo build --release`
 
-A necessary preprocessing step for the current version is some form of collinear block detection (for example SibeliaZ) and translating the block orders for each genome into unimog format.
+The resulting binaries (`carp`,`carpscan`,`extract`) are then found in `./target/release/`.
 
-## How to run SCJ-CARP
-*Note: `scj_carp` depends on `networkx`.*
-
-Run `python3 scj_carp.py <unimog>` where `<unimog>` contains all genomes in unimog format (https://bibiserv.cebitec.uni-bielefeld.de/dcj).
-
-The script will output a triple ("Carp index") consisting of the CARP measure, total number of marker occurrences in the pangenome and relative CARP measure (CARP measure divided by pangenome size).
-
-### Optional Parameters
+## How to run
 
 
+All binaries need to be run with either `--gfa <your-file> ` to read `<your-file>` in [gfa format](https://gfa-spec.github.io/GFA-spec/GFA1.html) or with `--unimog <your-file> ` to read `<your-file>` in [unimog format](https://bibiserv.cebitec.uni-bielefeld.de/dcj).
 
-| parameter  | purpose |
+Currently we do not support the inferrence of telomeres from paths in gfa files. This may lead to small differences in the CARP measure.
+
+Optionally the binaries support the following parameters:
+
+| Parameter | Behavior |
 | ------ | ------ |
-| `--write-measure <file>` | Write the SCJ-CARP index to `<file>` |
-| `--write-carp-adjacencies <file2>` | Write one possible set of adjacencies of an SCJ-CARP ancestor to `<file2>` |
-| `--core` | Project the set of markers to only those occurring in all extant genomes. (Currently not recommended) |
+| `-s`/`--size-thresh <st>`| Filter out all nodes smaller than `<st>`. Note: Since unimog files do not support node lengths, this will filter all nodes in a graph from a unimog file |
+| `-t`/`--num-threads <t>`       | Use `<t>` threads for the main computation of the program. This currently does not apply to file reading or graph timming.       |
+| `-h`/`--help`       | Displays a help text for the given program |
+
+### `carp`
+
+This program calculates the SCJ CARP measure for the given pangenome and outputs it to the command line. 
+
+`-m`/`--write-measure <p>` writes the CARP measure to file `<p>`.
+
+`-a`/`--write-ancestor <p>`  writes one potential set of  ancestral adjacencies to file `<p>`.
+
+<details><summary>Example</summary>
+
+`./target/release/carp --gfa test.gfa -m test_measure.txt -a test_ancestor.txt `
+
+</details>
+
+### `carpscan`
+
+This program calculates the SCJ CARP measure for the environment of each node in the (trimmed) graph.
+By default it outputs the 1% nodes with the most complex environment as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
+
+`-c`, `--context-len <c>` Defines the context length `<c>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
+
+`--colored-gfa <f>`         Outputs an annotated gfa to `<f>` visualizing complexities. Can be opened in bandage.
+
+`--output-histogram <f>`    Outputs counts for a histogram of complexities. Use `plotscripts/plot_hist.py` to visualize it.
+
+`--lower-percentile <lo>`   Output node ids that lie between the lower and higher percentile to standard output. Default 0.99.
+
+`--higher-percentile <hi>`  Output node ids that lie between the lower and higher percentile to standard output. Default 1.00.
+
+<details><summary>Example</summary>
+
+`./target/release/carpscan --gfa test.gfa  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
+
+View the histogram with: ` python3 plotscripts/plot_hist.py test.hist  --num-buckets 1000`
+
+Open `test_colored.gfa` in bandage for a visualization of node complexities.
+</details>
+
+### `extract`
+
+This program allows to ectract the surrounding graph of a node to gfa. This gfa file is output to stdout and needs to be piped into a file.
+
+`-n, --start-node <n>`    Id `<n>` of the start node.
+
+`-d, --max-dist <d>`    Defines the context length `<d>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
 
 
-
-## Snakemake Workflow
-
-The workflow depends on both Snakemake and ZOMBI. Be sure that both of these are installed on your system.
-
-**Important**: Before running the workflow change the variable `ZOMBI_HOME` in the Snakefile to the installation of ZOMBI on your machine.
-
-To replicate the experiments from the manuscript, first navigate in your command line to the top directory of this repository.
-You can then run the two experiments with the following rules:
-
-
-| Experiment | Rule | Result File | Plot Scripts (`./plotscripts/`) |
-| ------| ------ | ----- | ---- |
-| Scaling rates of Adjacency modifying operations (Duplications, Losses, Inversions, Transpositions, Originations) | `all_treescale_results` | `treescale/treescale.txt` | `rearrangement_vs_measure.py`, `rearrangement_vs_precrec.py`|
-| Scaling rates of Non-Adjacency modifying operations (Horizontal (Replacement) Transfers) | `all_transfer` |`transferexp/transfercarp.txt` | `transfer_vs_measure.py`, `transfer_vs_precrec.py` |
-
-To run the workflow, simply type `snakemake <rule> --cores <n-cores>`, where `<rule>` is one of the above rules and `<n-cores>` is the number of cores you want to use.
-
-For example, `snakemake all_treescale_results --cores 4`.
-
-The table of results (SCJ-CARP measure) and precision/recall can then be found in the corresponding result file.
-To replicate one of the pots, simply run the corresponding script, inputting the result file as an argument, for example
-
-`python3 plotscripts/rearrangement_vs_precrec.py treescale/treescale.txt`.

@@ -1,0 +1,10 @@
+S	nd1	AAAAA
+S	nd2	AA
+
+S	nd3
+S	nd4	AAAAAA
+L	nd1	+	nd4	+
+L	nd4	+	nd1	+
+L	nd2	+	nd4	+
+L	nd4	+	nd3	-
+L	nd3	-	nd2	+
