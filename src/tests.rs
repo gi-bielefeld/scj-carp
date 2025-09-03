@@ -94,6 +94,7 @@ use crate::mbg::*;
     }
 
     fn general_ubg_sanity_check(ubg: &impl RearrangementGraph) {
+        
         //forbidden telomere thing
         assert!(ubg.degree(1).is_none());
         if ubg.degree(TELOMERE).unwrap_or(0) > 0 {
@@ -125,6 +126,7 @@ use crate::mbg::*;
             }
             
         }
+        assert_eq!(find_dups(&ubg.iter_adjacencies().collect()),Vec::new());
     }
 
     #[test]
@@ -148,6 +150,25 @@ use crate::mbg::*;
         assert!(ubg.adj_neighbors(tail(3)).unwrap().collect::<HashSet<_>>().eq(&HashSet::from([tail(2)])));
         assert!(ubg.adj_neighbors(tail(1)).unwrap().collect::<HashSet<_>>().eq(&HashSet::from([head(3)])));
     }
+
+    #[test]
+    fn test_read_double_unimog() {
+        mtest_read_double_unimog::<UBG>();
+        mtest_read_double_unimog::<MBG>();
+    }
+
+    fn mtest_read_double_unimog<T>()
+    where T : RearrangementGraph 
+    {
+        let ubg =  T::from_unimog("testfiles/test13.ug").expect("File should be readable");
+        general_ubg_sanity_check(&ubg);
+        let m1 = ubg.name_to_marker("1").unwrap();
+        let m2 = ubg.name_to_marker("2").unwrap();
+        let m3 = ubg.name_to_marker("3").unwrap();
+        for x in [head(m1),tail(m1),head(m2),tail(m2),head(m3),tail(m3)] {
+            assert_eq!(ubg.degree(x).unwrap(),1);
+        }
+    } 
 
     fn collect_neighbors(ubg : &impl RearrangementGraph,xtr : Extremity) -> HashSet<Extremity> {
         ubg.adj_neighbors(xtr).unwrap().collect()

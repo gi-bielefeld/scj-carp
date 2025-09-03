@@ -232,7 +232,7 @@ pub fn top_percentile(node_complexities : &HashMap<Marker,usize>,percentile_low 
             break;
         }
     }
-    eprintln!("Lowthresh {thresh_low:?} Highthresh {thresh_high:?}");
+    //eprintln!("Lowthresh {thresh_low:?} Highthresh {thresh_high:?}");
     let mut complex_nodes = Vec::new();
     if let (Some(lt),Some(ht)) = (thresh_low,thresh_high) {
         for (u,ci) in node_complexities {

@@ -70,11 +70,11 @@ fn main() {
         .arg(arg!(-u --"unimog" <f> "Specify input as unimog file."))
         .group(ArgGroup::new("infile").args(["gfa","unimog"])
                     .required(true))
-        .arg(arg!(-c --"context-len" <c>).value_parser(value_parser!(usize)).default_value("10000"))
+        .arg(arg!(-c --"context-len" <c>).value_parser(value_parser!(usize)).default_value("500"))
         .arg(arg!(--"colored-gfa" <f> "Output annotated gfa with complexities."))
         .arg(arg!(--"output-histogram" <f> "Output a histogram of complexities."))
-        .arg(arg!(--"lower-percentile" <lo> "Output nodes that lie between the lower and higher percentile to standard output. Default 0.99").value_parser(value_parser!(f64)).default_value("0.99"))
-        .arg(arg!(--"higher-percentile" <hi> "Output nodes that lie between the lower and higher percentile to standard output. Default 1.00").value_parser(value_parser!(f64)).default_value("1.00"))
+        .arg(arg!(--"lower-percentile" <lo> "Output nodes that lie between the lower and higher percentile to standard output.").value_parser(value_parser!(f64)))
+        .arg(arg!(--"higher-percentile" <hi> "Output nodes that lie between the lower and higher percentile to standard output.").value_parser(value_parser!(f64)).default_value("1.00"))
         .arg(arg!(-t --"num-threads" <t> "Number of threads to use in the scanning phase. Default: 1.").value_parser(value_parser!(usize)).default_value("1"));
     
     let matches = cmd.get_matches();
@@ -92,9 +92,11 @@ fn main() {
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     eprintln!("Adding telomeres to complete graph.");
     graph.fill_telomeres();
-    eprintln!("Trimming graph.");
-    graph.trim_any(thresh,n_threads);
-    graph.fill_telomeres();
+    if thresh > 0 {
+        eprintln!("Trimming graph.");
+        graph.trim_any(thresh,n_threads);
+        graph.fill_telomeres();
+    }
     let node_c  =  scan_graph_enum_multithread(&graph, contextlen,n_threads);
     let mn = *node_c.values().min().unwrap();
     let mut mx = * node_c.values().max().unwrap();
@@ -118,6 +120,7 @@ fn main() {
         write_hist(&hist,histogrampath).expect("Could not write histogram file.");
     }
     if let (Some(lo),Some(hi)) = (matches.get_one::<f64>("lower-percentile"),matches.get_one::<f64>("higher-percentile")) {
+        println!("#Node\tSCJ-CARP-measure in env");
         for marker in top_percentile(&node_c, *lo, *hi) {
             let complexity = node_c.get(&marker).unwrap();
             println!("{marker}\t{complexity}");
