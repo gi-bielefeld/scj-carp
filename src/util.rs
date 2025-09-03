@@ -7,7 +7,7 @@ pub const ONE_MILLION :usize = 1000000;
 
 pub const CARP_LOGO : &str = 
 "   oo.              You're running SCJ CARP
- o00O                         Version 0.0.1
+ o00O                         Version 0.1.0
   O00O                                     
   O00.                                     
   O0O          Feel free to report bugs at:
@@ -35,7 +35,7 @@ pub const CARP_LOGO : &str =
 ";
 
 
-pub const CARP_VERSION : &str = "0.0.1";
+pub const CARP_VERSION : &str = "0.1.0";
 
 pub fn reverse_map<K,V>(m : &HashMap<K,V>) -> HashMap<V,K>
 where
