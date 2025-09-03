@@ -585,6 +585,7 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
         }
 
     }
+    //eprintln!("nids : {node_ids:?}");
     Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE])})
 }
 

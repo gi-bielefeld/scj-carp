@@ -120,10 +120,12 @@ fn main() {
         write_hist(&hist,histogrampath).expect("Could not write histogram file.");
     }
     if let (Some(lo),Some(hi)) = (matches.get_one::<f64>("lower-percentile"),matches.get_one::<f64>("higher-percentile")) {
+        let mmap = graph.marker_names();
         println!("#Node\tSCJ-CARP-measure in env");
         for marker in top_percentile(&node_c, *lo, *hi) {
             let complexity = node_c.get(&marker).unwrap();
-            println!("{marker}\t{complexity}");
+            let markerstring = mmap.get(&marker).unwrap();
+            println!("{markerstring}\t{complexity}");
         }
     } 
 }
