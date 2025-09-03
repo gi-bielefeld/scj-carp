@@ -1,6 +1,10 @@
 use clap::{arg, value_parser, ArgGroup, Command};
-use scj_carp_rust::{adjacency_neighborhood,partial2gfa,MBG,RearrangementGraph};
 use std::io;
+
+use scj_carp_rust::mbg::MBG;
+use scj_carp_rust::rearrangement::RearrangementGraph;
+use scj_carp_rust::scan::adjacency_neighborhood;
+use scj_carp_rust::gfa::partial2gfa;
 
 fn main() {
     let matches = Command::new("filter")
@@ -27,7 +31,7 @@ fn main() {
     graph.fill_telomeres();
     if thresh > 0 {
         eprintln!("Trimming graph.");
-        graph.trim(thresh);
+        graph.trim_singlethread(thresh);
     }
     graph.fill_telomeres();
     let start_node : &String = matches.get_one(&"start-node").expect("CLI Parsing gone wrong");

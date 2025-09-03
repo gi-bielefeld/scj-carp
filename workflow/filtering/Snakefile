@@ -1,0 +1,35 @@
+
+
+INPUT_DIR='/vol/moreratsdata/homo/'
+INPUT_GENOMES=["hprc-v1.0-mc-chm13", "hprc-v1.0-minigraph-chm13", "hprc-v1.0-pggb"]
+OUTPUT_DIR = '/vol/moreratsdata/homo/results'
+
+SIZE_THRESHOLDS = [0,50,100,200,400,800,1600]
+
+
+rule all_measure:
+    input:
+        expand(OUTPUT_DIR+"measures/{genome}_s{size}.txt",genome=INPUT_GENOMES,size=SIZE_THRESHOLDS)
+
+rule calc_measure:
+    input:
+        genome=INPUT_DIR+"{genome}.gfa.gz",
+        binary="../../target/release/carp"
+    output:
+        OUTPUT_DIR+"measures/{genome}_s{size}.txt"
+    threads:
+        16
+    log:
+         std=OUTPUT_DIR+"logs/carp_{genome}_s{size}.log",
+         err=OUTPUT_DIR+"logs/carp_{genome}_s{size}.errlog"
+    benchmark:
+        OUTPUT_DIR+"bench/carp_{genome}_s{size}.txt"
+    shell:
+        '{input.binary} --gfa {input.genome} -t {threads} -m {output} -s {wildcards.size} > {log.std} 2> {log.err}'
+
+        
+rule compile:
+    output:
+        "../../target/release/carp"
+    shell:
+        "cd ..; cargo build --release"
