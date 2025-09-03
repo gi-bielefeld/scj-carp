@@ -52,8 +52,8 @@ def get_max_rfile_nr():
 
 findx = get_max_rfile_nr()
 for nmarkers in [25,50]:
-    for conn_prob in np.arange(0.1,1.1,0.1):
-        for self_conn_prob in np.arange(0.1,1.1,0.1):
+    for conn_prob in np.arange(0.1,1.1,0.3):
+        for self_conn_prob in np.arange(0.1,1.1,0.3):
             for i in range(SAMPLES):
                 findx+=1
                 flname = "test_{}.gfa".format(findx)

@@ -1,33 +1,10 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Write};
 use clap::{arg, value_parser, ArgGroup, Command};
-use scj_carp_rust::*;
-
-
-
-
-
-fn output_ancestral_adj(mid2string : &HashMap<Marker,String>,uncontested: &Vec<Adjacency>,outfile: &mut File) {
-    //println!("Writing ancestral adjacencies...");
-    for (x,y) in uncontested {
-        let xt = match is_tail(*x) {
-            true => "t",
-            false => "h"
-        };
-        let yt = match is_tail(*y){
-            true => "t",
-            false => "h"
-        };
-        if *x == 0 || *y==0 {
-            continue;
-        }
-        let xm = mid2string.get(&marker(*x)).expect("Retranslating went wrong");
-        let ym = mid2string.get(&marker(*y)).expect("Retranslating went wrong");
-        outfile.write(format!("{xm} {xt}\t{ym} {yt}\n").as_bytes()).expect("Could not write ancestral file.");
-        
-    }
-}
+use scj_carp_rust::mbg::*;
+use scj_carp_rust::util::*;
+use scj_carp_rust::rearrangement::{RearrangementGraph,output_ancestral_adj};
+use scj_carp_rust::measure::calc_carp_measure_multithread;
 
 fn measure_to_file(p : &str, m : usize, nmarkers : usize) {
     let mut fl = File::create(p).expect("Could not create measure file");
