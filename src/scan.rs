@@ -149,6 +149,8 @@ fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : u
 
 pub fn scan_graph_enum_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_threads : usize) -> HashMap<Marker, usize> {
     let mmax : Marker = graph.markers().max().unwrap_or(0)+1;
+    let mrk : Vec<usize> = graph.markers().collect();
+    eprintln!("Markers {mrk:?}");
     let mut node_complexities = HashMap::new();
     let totlen = mmax;
     thread::scope(|scope| {
