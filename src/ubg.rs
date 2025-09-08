@@ -1,6 +1,6 @@
 use crate::rearrangement::*;
 use crate::gfa::{LEN_PREFIX,get_or_set_node_id,parse_marker};
-use crate::util::{reverse_map, SAFE_GFA_OVERLAP};
+use crate::util::{reverse_map};
 use std::collections::{HashMap, HashSet};
 use csv::{ReaderBuilder};
 use std::io::{self, BufRead, BufReader};

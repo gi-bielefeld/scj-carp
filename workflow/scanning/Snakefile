@@ -14,7 +14,7 @@ rule all_histogram:
 rule calc_scan:
     input:
         genome=INPUT,
-        binary="../../target/release/carpscan"
+        binary="../../target/release/carp-scan"
     output:
         OUTPUT_DIR+"hist/scan_c{clen}.hist"
     threads:
