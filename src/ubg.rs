@@ -1,6 +1,6 @@
 use crate::rearrangement::*;
 use crate::gfa::{LEN_PREFIX,get_or_set_node_id,parse_marker};
-use crate::util::reverse_map;
+use crate::util::{reverse_map, SAFE_GFA_OVERLAP};
 use std::collections::{HashMap, HashSet};
 use csv::{ReaderBuilder};
 use std::io::{self, BufRead, BufReader};
@@ -145,7 +145,10 @@ impl RearrangementGraph for UBG  {
         return UBG { node_sizes:sizes, adjacencies: adj, node_ids: nids }
     }
 
-    fn from_gfa(path: &str) -> io::Result<UBG>{
+    fn from_gfa(path: &str,ignore_overlap : bool) -> io::Result<UBG>{
+    if !ignore_overlap {
+        panic!("Not implemented.");
+    }
     eprintln!("Read gfa.");
     let mut node_sizes = HashMap::new();
     let mut adjacencies = HashMap::new(); 
@@ -307,6 +310,10 @@ fn name_to_marker(&self,name : &str) -> Option<Marker> {
 
 fn marker_names(&self) -> HashMap<Marker,String> {
     reverse_map(&self.node_ids)
+}
+
+fn overlap(&self,_:Extremity,_:Extremity) -> usize {
+    return 0;
 }
 }
 

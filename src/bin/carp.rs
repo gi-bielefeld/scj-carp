@@ -27,13 +27,19 @@ fn main() {
         .arg(arg!(-t --"num-threads" <t> "Number of threads to use to calculate SCJ CARP index.").value_parser(value_parser!(usize)).default_value("1"))
         .get_matches();
     
-    let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
+    let mut thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
     let threads = *matches.get_one(&"num-threads").expect("CLI Parsing gone wrong");
+    let is_unimog = matches.get_one::<String>("unimog").is_some();
+    if is_unimog && thresh > 0 {
+        eprintln!("Warning: Unimog files do not support node sizes. Ignoring --size-thresh flag.");
+        thresh = 0;
+    }
+
     eprintln!("{}",CARP_LOGO);
     println!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf,true),
         (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };

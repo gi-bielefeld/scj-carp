@@ -236,7 +236,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_read_gfa_path() {
-        let mut mbg = MBG::from_gfa("testfiles/test08.gfa").unwrap();
+        let mut mbg = MBG::from_gfa("testfiles/test08.gfa",true).unwrap();
         general_ubg_sanity_check(&mbg);
         let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
@@ -260,7 +260,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_read_gfa_walk() {
-        let mut mbg = MBG::from_gfa("testfiles/test10.gfa").unwrap();
+        let mut mbg = MBG::from_gfa("testfiles/test10.gfa",true).unwrap();
         general_ubg_sanity_check(&mbg);
         let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
@@ -284,7 +284,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_read_gfa_path_single() {
-        let mbg = MBG::from_gfa("testfiles/test09.gfa").unwrap();
+        let mbg = MBG::from_gfa("testfiles/test09.gfa",true).unwrap();
         general_ubg_sanity_check(&mbg);
         let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
@@ -297,7 +297,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_read_gfa_walk_single() {
-        let mbg = MBG::from_gfa("testfiles/test11.gfa").unwrap();
+        let mbg = MBG::from_gfa("testfiles/test11.gfa",true).unwrap();
         general_ubg_sanity_check(&mbg);
         let tels : HashSet<Extremity> = mbg.adj_neighbors(TELOMERE).unwrap().collect();
         let mut expect : HashSet<Extremity> = HashSet::new();
@@ -323,9 +323,9 @@ use crate::mbg::*;
             let tmpval = x.path();
             let gfafile = tmpval.to_str().unwrap();
             eprintln!("Tesing {gfafile}");
-            let mut ubg = UBG::from_gfa(gfafile).expect("X");
+            let mut ubg = UBG::from_gfa(gfafile,true).expect("X");
             ubg.fill_telomeres();
-            let mut mbg = MBG::from_gfa(gfafile).expect("Y");
+            let mut mbg = MBG::from_gfa(gfafile,true).expect("Y");
             mbg.fill_telomeres();
             eprintln!("Sanity checking UBG.");
             general_ubg_sanity_check(&ubg);
@@ -368,9 +368,9 @@ use crate::mbg::*;
             let tmpval = x.path();
             let gfafile = tmpval.to_str().unwrap();
             eprintln!("Tesing {gfafile}");
-            let mut ubg = UBG::from_gfa(gfafile).expect("X");
+            let mut ubg = UBG::from_gfa(gfafile,true).expect("X");
             ubg.fill_telomeres();
-            let mut mbg = MBG::from_gfa(gfafile).expect("Y");
+            let mut mbg = MBG::from_gfa(gfafile,true).expect("Y");
             mbg.fill_telomeres();
             let (c,uc) = calc_carp_measure_naive(&ubg);
             let (cc,ucc) = calc_carp_measure_naive(&mbg);
@@ -393,7 +393,7 @@ use crate::mbg::*;
             let tmpval = x.path();
             let gfafile = tmpval.to_str().unwrap();
             eprintln!("Scan Tesing {gfafile}");
-            let mut mbg = MBG::from_gfa(gfafile).expect("Y");
+            let mut mbg = MBG::from_gfa(gfafile,true).expect("Y");
             mbg.fill_telomeres();
             let compl = scan_graph(&mbg, 30);
             let complm = scan_graph_enum_multithread(&mbg, 30, 7);
@@ -414,7 +414,7 @@ use crate::mbg::*;
     where T : RearrangementGraph
      {
         for path in ["test01.ug","testfiles/test04.gfa","testfiles/test06.gfa","testfiles/test07.gfa"] {
-            let x = T::from_gfa(path);
+            let x = T::from_gfa(path,true);
             assert!(x.is_err());
         } 
     }
@@ -427,7 +427,7 @@ use crate::mbg::*;
     fn mtest_emoji<T>()
     where T : RearrangementGraph
     {
-        let mut ubg = T::from_gfa("testfiles/test03.gfa").expect("File should be readable");
+        let mut ubg = T::from_gfa("testfiles/test03.gfa",true).expect("File should be readable");
         //eprintln!("nodes {:?}",ubg.node_ids);
         //eprintln!("sizes {:?}",ubg.node_sizes);
         ubg.fill_telomeres();
@@ -449,7 +449,7 @@ use crate::mbg::*;
     fn mtest_read_gfa<T>()
     where T : RearrangementGraph
      {
-        let mut ubg = T::from_gfa("testfiles/test02.gfa").expect("File should be readable");
+        let mut ubg = T::from_gfa("testfiles/test02.gfa",true).expect("File should be readable");
         ubg.fill_telomeres();
         general_ubg_sanity_check(&ubg);
         for i in 1..=4 {
@@ -516,8 +516,8 @@ use crate::mbg::*;
 
     #[test]
     fn test_carp_eva() {
-        let ubg = UBG::from_gfa("testfiles/test02.gfa").expect("File should be readable");
-        let mbg = MBG::from_gfa("testfiles/test02.gfa").expect("File should be readable");
+        let ubg = UBG::from_gfa("testfiles/test02.gfa",true).expect("File should be readable");
+        let mbg = MBG::from_gfa("testfiles/test02.gfa",true).expect("File should be readable");
         let (contested,uncontested) = calc_carp_measure_naive(&ubg);
         let (mcontested,muncontested) = calc_carp_measure_naive(&mbg);
         assert_eq!(contested,mcontested);
@@ -569,8 +569,8 @@ use crate::mbg::*;
 
     #[test]
     fn test_trim_ypestis() {
-        let mut mbg = MBG::from_gfa("testfiles/test_ypestis.gfa").expect("File should be readable");
-        let mut ubg = UBG::from_gfa("testfiles/test_ypestis.gfa").expect("File should be readable");
+        let mut mbg = MBG::from_gfa("testfiles/test_ypestis.gfa",true).expect("File should be readable");
+        let mut ubg = UBG::from_gfa("testfiles/test_ypestis.gfa",true).expect("File should be readable");
         mbg.fill_telomeres();
         ubg.fill_telomeres();
         equivalence_check(&mbg, &ubg);
@@ -596,7 +596,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_multithread_trimming_empty() {
-        let mut mbg = MBG::from_gfa("testfiles/test_16s.gfa").expect("File should be readable");
+        let mut mbg = MBG::from_gfa("testfiles/test_16s.gfa",true).expect("File should be readable");
         mbg.fill_telomeres();
         mbg.trim_multithread(ONE_MILLION,2);
         general_ubg_sanity_check(&mbg);
@@ -608,7 +608,7 @@ use crate::mbg::*;
 
     #[test]
     fn test_scan() {
-        let mut mbg = MBG::from_gfa("testfiles/test12.gfa").unwrap();
+        let mut mbg = MBG::from_gfa("testfiles/test12.gfa",true).unwrap();
         mbg.fill_telomeres();
         general_ubg_sanity_check(&mbg);
         let m1 = mbg.name_to_marker("1").unwrap();
@@ -812,4 +812,48 @@ fn test_percentile() {
     let exp = [2].iter().copied().collect();
     assert_eq!(tps,exp);
 
+}
+
+
+
+#[test]
+fn test_overlap_environment() {
+    let graph = MBG::from_gfa("testfiles/test14.gfa", false).unwrap();
+    let m1 = graph.name_to_marker("1").unwrap();
+    let m2 = graph.name_to_marker("2").unwrap();
+    let m3 = graph.name_to_marker("3").unwrap();
+    let m4 = graph.name_to_marker("4").unwrap();
+    let m5 = graph.name_to_marker("5").unwrap();
+    let m6 = graph.name_to_marker("6").unwrap();
+    let m7 = graph.name_to_marker("7").unwrap();
+
+    let mut expect : HashSet<Adjacency> = HashSet::new();
+    expect.insert((head(m1),head(m2)));
+    expect.insert((head(m1),head(m6)));
+    let res = adjacency_neighborhood(m1, 40, &graph);
+    assert_eq!(expect,res);
+    let res = adjacency_neighborhood(m1, 42, &graph);
+    expect.insert((tail(m6),head(m6)));
+    assert_eq!(expect,res);
+    expect.insert((tail(m2),tail(m3)));
+    let res = adjacency_neighborhood(m1,76, &graph);
+    assert_eq!(expect,res);
+    expect.insert((head(m3),tail(m4)));
+    let res = adjacency_neighborhood(m1,77, &graph);
+    assert_eq!(expect,res);
+    expect.insert((head(m4),tail(m5)));
+    let res = adjacency_neighborhood(m1,136, &graph);
+    assert_eq!(expect,res);
+    let res = adjacency_neighborhood(m1,176, &graph);
+    assert_eq!(expect,res);
+    expect.insert((head(m5),head(m5)));
+    let res = adjacency_neighborhood(m1,177, &graph);
+    assert_eq!(expect,res);
+    let res = adjacency_neighborhood(m1,328, &graph);
+    assert_eq!(expect,res);
+    expect.insert((head(m2),head(m7)));
+    let res = adjacency_neighborhood(m1,329, &graph);
+    assert_eq!(expect,res);
+    let res = adjacency_neighborhood(m1,1000, &graph);
+    assert_eq!(expect,res);
 }

@@ -57,7 +57,7 @@ pub fn adjacency_neighborhood(m : Marker,max_depth : usize, graph : &impl Rearra
                 let oend = other(neigbor);
                 
                 
-                let ndist: usize = cost + graph.node_size(marker(neigbor)).unwrap_or(1);//.node_sizes.get(&marker(*neigbor)).unwrap_or(&1);
+                let ndist: usize = cost + graph.node_size(marker(neigbor)).unwrap_or(1) - graph.overlap(position, neigbor);//.node_sizes.get(&marker(*neigbor)).unwrap_or(&1);
                 if ndist <= max_depth && *min_dist.get(&oend).unwrap_or(&(ndist+1)) > ndist {
                     visited.push(State{cost: ndist,position: oend});
                     min_dist.insert(oend, ndist);
@@ -149,8 +149,6 @@ fn scan_enumerate(graph : &impl RearrangementGraph, max_depth :usize , start : u
 
 pub fn scan_graph_enum_multithread(graph : &impl RearrangementGraph,max_depth :usize, n_threads : usize) -> HashMap<Marker, usize> {
     let mmax : Marker = graph.markers().max().unwrap_or(0)+1;
-    let mrk : Vec<usize> = graph.markers().collect();
-    eprintln!("Markers {mrk:?}");
     let mut node_complexities = HashMap::new();
     let totlen = mmax;
     thread::scope(|scope| {
