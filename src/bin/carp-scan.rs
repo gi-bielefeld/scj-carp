@@ -1,6 +1,7 @@
 use std::collections::{HashMap};
 use std::fs::File;
 use std::io::{self, Write};
+use std::process::exit;
 use clap::{arg, value_parser, ArgGroup, Command};
 use scj_carp_rust::rearrangement::*;
 use scj_carp_rust::util::*;
@@ -46,7 +47,7 @@ fn to_gfa_annotated(graph : &impl RearrangementGraph, annotations : &HashMap<Mar
 
 fn to_heat_html( x :f64) -> String {
     let redval = (255.0*x) as u8;
-    let blueval = (255.0*0.5*(1.0-x)) as u8;
+    let blueval = 110 as u8;
     format!("#{:02x}00{:02x}",redval,blueval)
 }
 
@@ -64,8 +65,8 @@ fn main() {
     //TODO: make struct
     let cmd = Command::new("scj-carp")
         .arg(arg!(-s --"size-thresh" <st> "Size threshold for nodes (nodes of lower sizes are discarded)")
-            .value_parser(value_parser!(usize))
-            .default_value("0"))
+        .value_parser(value_parser!(usize))
+        .default_value("0"))
         .arg(arg!(-g --"gfa" <f> "Specify input as GFA file."))
         .arg(arg!(-u --"unimog" <f> "Specify input as unimog file."))
         .group(ArgGroup::new("infile").args(["gfa","unimog"])
@@ -75,17 +76,32 @@ fn main() {
         .arg(arg!(--"output-histogram" <f> "Output a histogram of complexities."))
         .arg(arg!(--"lower-percentile" <lo> "Output nodes that lie between the lower and higher percentile to standard output.").value_parser(value_parser!(f64)))
         .arg(arg!(--"higher-percentile" <hi> "Output nodes that lie between the lower and higher percentile to standard output.").value_parser(value_parser!(f64)).default_value("1.00"))
-        .arg(arg!(-t --"num-threads" <t> "Number of threads to use in the scanning phase. Default: 1.").value_parser(value_parser!(usize)).default_value("1"));
+        .arg(arg!(-t --"num-threads" <t> "Number of threads to use in the scanning phase. Default: 1.").value_parser(value_parser!(usize)).default_value("1"))
+        .arg(arg!(--"ignore-gfa-overlap").num_args(0));
     
     let matches = cmd.get_matches();
-    let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
+    let mut thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
     let contextlen = *matches.get_one(&"context-len").expect("CLI Parsing gone wrong");
     let n_threads = *matches.get_one(&"num-threads").expect("CLI parsing gone wrong");
+    let ignore_gfa_overlap = matches.get_flag(&"ignore-gfa-overlap");
+    let is_gfa = matches.get_one::<String>("gfa").is_some();
+    let is_unimog = matches.get_one::<String>("unimog").is_some();
+    if !is_gfa && ignore_gfa_overlap {
+        eprintln!("Warning: Not a gfa file. Ignoring --ignore-gfa-overlap flag.")
+    }
+    if is_unimog && thresh > 0 {
+        eprintln!("Warning: Unimog files do not support node sizes. Ignoring --size-thresh flag.");
+        thresh = 0;
+    }
+    if thresh > 0 && !ignore_gfa_overlap {
+        eprintln!("Error: A gfa graph can only be trimmed with the --ignore-gfa-overlap flag.");
+        exit(1);
+    }
     eprintln!("{}",CARP_LOGO);
     eprintln!("Reading graph...");
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf,ignore_gfa_overlap),
         (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
@@ -105,7 +121,7 @@ fn main() {
     }
     let mut colors = HashMap::new();
     for (marker,carpi) in &node_c {
-        colors.insert(*marker, format!("CL:z:{}\tcrp:i:{}",to_heat_html((*carpi-mn) as f64/mx as f64),carpi));
+        colors.insert(*marker, format!("CL:z:{}\tcrp:i:{}",to_heat_html(((*carpi-mn) as f64).log2()/(mx as f64).log2()),carpi));
     }
     //find median node
     //node_c.sort_by(|a,b| a.1.cmp(&b.1));

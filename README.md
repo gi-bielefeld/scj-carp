@@ -4,7 +4,7 @@
 
 `cargo build --release`
 
-The resulting binaries (`carp`,`carpscan`,`extract`) are then found in `./target/release/`.
+The resulting binaries (`carp`,`carp-scan`,`carp-extract`) are then found in `./target/release/`.
 
 ## How to run
 
@@ -34,10 +34,10 @@ This program calculates the SCJ CARP measure for the given pangenome and outputs
 
 </details>
 
-### `carpscan`
+### `carp-scan`
 
 This program calculates the SCJ CARP measure for the environment of each node in the (trimmed) graph.
-By default it outputs the 1% nodes with the most complex environment as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
+It can output the a certain percentile of nodes by surrounding complexity as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
 
 `-c`, `--context-len <c>` Defines the context length `<c>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
 
@@ -45,20 +45,20 @@ By default it outputs the 1% nodes with the most complex environment as identifi
 
 `--output-histogram <f>`    Outputs counts for a histogram of complexities. Use `plotscripts/plot_hist.py` to visualize it.
 
-`--lower-percentile <lo>`   Output node ids that lie between the lower and higher percentile to standard output. Default 0.99.
+`--lower-percentile <lo>`   Output node ids that lie between the lower and higher percentile to standard output.
 
 `--higher-percentile <hi>`  Output node ids that lie between the lower and higher percentile to standard output. Default 1.00.
 
 <details><summary>Example</summary>
 
-`./target/release/carpscan --gfa test.gfa  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
+`./target/release/carp-scan --gfa test.gfa  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
 
 View the histogram with: ` python3 plotscripts/plot_hist.py test.hist  --num-buckets 1000`
 
 Open `test_colored.gfa` in bandage for a visualization of node complexities.
 </details>
 
-### `extract`
+### `carp-extract`
 
 This program allows to ectract the surrounding graph of a node to gfa. This gfa file is output to stdout and needs to be piped into a file.
 

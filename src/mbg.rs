@@ -16,6 +16,7 @@ pub struct MBG {
     adjacencies : Vec<Vec<Extremity>>,
     node_ids : HashMap<String,Marker>,
     masked_markers : HashSet<Marker>,
+    ext_overlap : usize
 }
 
 
@@ -121,7 +122,7 @@ impl MBG {
     }
 
 
-    fn gfa_from_any_reader<R>(rdr : &mut Reader<R>) -> Result<MBG, io::Error>
+    fn gfa_from_any_reader<R>(rdr : &mut Reader<R>,ignore_overlap : bool) -> Result<MBG, io::Error>
     where 
         R : std::io::Read
     {
@@ -134,6 +135,9 @@ impl MBG {
         let mut n_edges :usize = 0;
         let mut telomeres : HashSet<(String,bool)> = HashSet::new();
         let mut seen_edges = HashSet::new();
+        let mut x_overlap : Option<usize> = None;
+        let mut warned_overlaps = false;
+        let mut warned_cigar = None;
         for res in rdr.records() {
             let x = res?;
             i+=1;
@@ -204,6 +208,28 @@ impl MBG {
                     n_edges+=1;
                     seen_edges.insert(cane);
                 }
+                if !ignore_overlap {
+                    if let Some(cigar) = x.get(5) {
+                        let prs_ovlp = cigar.strip_suffix("M").ok_or("Cigar string does not end with M.".to_string()).and_then(|cstr| cstr.parse::<usize>().map_err(|e| e.to_string()));
+                        match prs_ovlp {
+                            Ok(overlap) => if overlap!=x_overlap.unwrap_or(overlap) {
+                                if SAFE_GFA_OVERLAP {
+                                    panic!("Not supported: Non-fixed overlaps in Cigar-string. Previous overlap {x_overlap:?}. Current overlap: {overlap}");
+                                } else {
+                                    warned_overlaps=true;
+                                    x_overlap=Some(0);
+                                }
+                            } else {
+                                x_overlap = Some(overlap);
+                            },
+                            Err(errmsg) => if SAFE_GFA_OVERLAP {
+                                panic!("Not supported: Non-match Cigar string overlaps: {cigar}. Error: {errmsg}. If you want to ignore this (at your own risk), recompile with SAFE_GFA_OVERLAP=false.");
+                            } else {
+                                warned_cigar=Some((cigar.to_owned(),errmsg));
+                            }
+                        }
+                    }
+            }
                 
             } else if entrytype == "P" {
                 let pname = x.get(1).expect("Path does not have a name identifier.");
@@ -265,9 +291,21 @@ impl MBG {
             adjacencies.get_mut(xtr).unwrap().push(TELOMERE);
             adjacencies.get_mut(TELOMERE).unwrap().push(xtr);
         }
-        //eprintln!("{node_sizes:?}");
+
+        let cigproblem = warned_cigar.is_some();
+        if let Some((cigar,errmsg)) = warned_cigar {
+            eprintln!("Warning: Unsupported Cigar string overlap: {cigar}. Error: {errmsg}.");
+        }
+
+        if warned_overlaps {
+            eprintln!("Warning: Unsupported overlaps in Cigar strings: Non-fixed length.")
+        }
+
+        if warned_overlaps || cigproblem {
+            eprintln!("Warning: all overlaps have been set to 0.")
+        }
         
-        Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE]) })
+        Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE]) , ext_overlap : x_overlap.unwrap_or(0)})
     }
     
     fn identify_removal_nodes_in_range(&self, min_size: usize,from : Marker, to:Marker) -> Vec<Marker> {
@@ -326,6 +364,7 @@ impl MBG {
     }
 
     pub fn trim_any(&mut self,min_size: usize, n_threads : usize) {
+         
         if n_threads == 1 {
             eprintln!("Trimming singlethreaded.");
             self.trim_singlethread(min_size);
@@ -334,6 +373,14 @@ impl MBG {
         let rm = self.identify_removal_nodes_mthread(min_size, n_threads);
         if rm.len() >= self.num_markers()/10 {
             eprintln!("More then 10% of nodes are scheduled for removal. Trimming singlethreaded.");
+            if self.ext_overlap > 0 {
+                if  SAFE_GFA_OVERLAP {
+                    panic!("Cannot safely trim graph with overlaps.");
+                } else {
+                    eprintln!("Trimming requires 0-Overlap between segments. Overlap will be ignored from now on.");
+                    self.ext_overlap=0;
+                }
+            }
             self.remove_all(&rm);
             return;
         }
@@ -454,6 +501,14 @@ impl RearrangementGraph for MBG {
     }
 
     fn trim_singlethread(&mut self, min_size : usize) {
+        if self.ext_overlap > 0 {
+            if  SAFE_GFA_OVERLAP {
+                panic!("Cannot safely trim graph with overlaps.");
+            } else {
+                eprintln!("Trimming requires 0-Overlap between segments. Overlap will be ignored from now on.");
+                self.ext_overlap=0;
+            }
+        }
         let nbefore = self.num_markers();
         let to_remove = self.identify_removal_nodes(min_size);
         eprintln!("Identified {} markers for removal.",to_remove.len());
@@ -493,21 +548,21 @@ impl RearrangementGraph for MBG {
         }
 
 
-        MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: nids, masked_markers: masked_markers }
+        MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: nids, masked_markers: masked_markers, ext_overlap :0 }
     }
 
 
-    fn from_gfa(path: &str) -> io::Result<Self>{
+    fn from_gfa(path: &str, ignore_overlap : bool) -> io::Result<Self>{
     if !path.ends_with(".gz") {
         eprintln!("Trying to read uncompressed gfa.");
         let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_path(path)?;
-        return Self::gfa_from_any_reader(&mut rdr);
+        return Self::gfa_from_any_reader(&mut rdr,ignore_overlap);
     } else{
         eprintln!("Trying to read compressed gfa.");
         let fl = File::open(path)?;
         let gz = MultiGzDecoder::new(fl);
         let mut rdr =  ReaderBuilder::new().has_headers(false).delimiter(b'\t').flexible(true).from_reader(gz);
-        return Self::gfa_from_any_reader(&mut rdr);
+        return Self::gfa_from_any_reader(&mut rdr,ignore_overlap);
     }
 }
 
@@ -586,7 +641,7 @@ fn from_unimog(path : &str) -> io::Result<MBG> {
 
     }
     //eprintln!("nids : {node_ids:?}");
-    Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE])})
+    Ok(MBG { node_sizes: node_sizes, adjacencies: adjacencies, node_ids: node_ids, masked_markers: HashSet::from([TELOMERE]), ext_overlap:0})
 }
 
 fn name_to_marker(&self,name : &str) -> Option<Marker> {
@@ -598,7 +653,14 @@ fn marker_names(&self) -> HashMap<Marker,String> {
 }
 
 fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
-
+    if self.ext_overlap > 0 {
+            if  SAFE_GFA_OVERLAP {
+                panic!("Cannot safely trim graph with overlaps.");
+            } else {
+                eprintln!("Trimming requires 0-Overlap between segments. Overlap will be ignored from now on.");
+                self.ext_overlap=0;
+            }
+    }
     if n_threads <= 1 {
         self.trim_singlethread(min_size);
         return;
@@ -637,7 +699,9 @@ fn trim_multithread(&mut self, min_size : usize, n_threads : usize) {
             eprintln!("Warning: Only {} markers left after trimming",self.num_markers())
     }
 }
-    
+    fn overlap(&self, _:Extremity,_:Extremity) -> usize {
+        return self.ext_overlap;
+    }
     
     
 }

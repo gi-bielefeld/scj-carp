@@ -26,11 +26,12 @@ Self: Sync
         fn num_markers(&self) -> usize;
         fn num_extremities(&self) -> usize;
         fn from_hash_maps(sizes : HashMap<Marker,usize>, adj :HashMap<Extremity,HashSet<Extremity>> ,  nids : HashMap<String,Marker>) -> Self;
-        fn from_gfa(path: &str) -> io::Result<Self>;
+        fn from_gfa(path: &str,ignore_overlap : bool) -> io::Result<Self>;
         fn fill_telomeres(&mut self);
         fn from_unimog(path : &str) -> io::Result<Self>;
         fn name_to_marker(&self,name : &str) -> Option<Marker>;
         fn marker_names(&self) -> HashMap<Marker,String>;
+        fn overlap(&self,x:Extremity,y:Extremity) -> usize;
 }
 
 

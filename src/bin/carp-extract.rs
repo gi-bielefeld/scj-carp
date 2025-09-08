@@ -1,6 +1,6 @@
 use clap::{arg, value_parser, ArgGroup, Command};
 use std::io;
-
+use std::process::exit;
 use scj_carp_rust::mbg::MBG;
 use scj_carp_rust::rearrangement::RearrangementGraph;
 use scj_carp_rust::scan::adjacency_neighborhood;
@@ -17,15 +17,32 @@ fn main() {
                     .required(true))
         .arg(arg!(-n --"start-node"<n> "start extracting from node"))
         .arg(arg!(-d --"max-dist" <d> "Maximum distance from start node").value_parser(value_parser!(usize)).required(true))
+        .arg(arg!(--"ignore-gfa-overlap").num_args(0))
+        .group(ArgGroup::new("overlap").args(["ignore-gfa-overlap","size-thresh"]))
         .get_matches();
+    let ignore_gfa_overlap = matches.get_flag(&"ignore-gfa-overlap");
+    let is_gfa = matches.get_one::<String>("gfa").is_some();
+    let is_unimog = matches.get_one::<String>("unimog").is_some();
+    let mut thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
+
+    if !is_gfa && ignore_gfa_overlap {
+        eprintln!("Warning: Not a gfa file. Ignoring --ignore-gfa-overlap flag.")
+    }
+    if is_unimog && thresh > 0 {
+        eprintln!("Warning: Unimog files do not support node sizes. Ignoring --size-thresh flag.");
+        thresh = 0;
+    }
+    if thresh > 0 && !ignore_gfa_overlap {
+        eprintln!("Error: A gfa graph can only be trimmed with the --ignore-gfa-overlap flag.");
+        exit(1);
+    }
     let maybe_graph = match (matches.get_one::<String>("gfa")
             , matches.get_one::<String>("unimog")) {
-        (Some(gfaf),_) => MBG::from_gfa(gfaf),
+        (Some(gfaf),_) => MBG::from_gfa(gfaf,ignore_gfa_overlap),
         (_,Some(unimog)) =>  MBG::from_unimog(&unimog),
         (_,_) => Err(io::Error::new(io::ErrorKind::Other,"No file specified."))
     };
-    let thresh = *matches.get_one(&"size-thresh").expect("CLI Parsing gone wrong");
-
+    
     let mut graph = maybe_graph.expect("Something went wrong parsing input files");
     eprintln!("Adding telomeres to complete graph.");
     graph.fill_telomeres();

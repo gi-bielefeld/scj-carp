@@ -2,6 +2,7 @@ use std::collections::{HashMap,HashSet};
 use std::hash::Hash;
 use crate::rearrangement::*;
 
+pub const SAFE_GFA_OVERLAP : bool = true;
 
 pub const ONE_MILLION :usize = 1000000;
 
