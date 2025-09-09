@@ -46,9 +46,11 @@ fn to_gfa_annotated(graph : &impl RearrangementGraph, annotations : &HashMap<Mar
 }
 
 fn to_heat_html( x :f64) -> String {
-    let redval = (255.0*x) as u8;
+
+    let redval = (255.0*x.min(0.5)*2.0) as u8;
+    let greenval = (255.0*(x-0.5).max(0.0)*2.0) as u8;
     let blueval = 110 as u8;
-    format!("#{:02x}00{:02x}",redval,blueval)
+    format!("#{:02x}{:02x}{:02x}",redval,greenval,blueval)
 }
 
 fn write_hist(hist:&HashMap<usize,usize>,path : &str) -> std::io::Result<()> {
