@@ -1,10 +1,8 @@
+INPUT = '/vol/moreratsdata/newexperiments-Apr_2025/subtilis_genbank_bifrost/graph.gfa.gz'
 
+OUTPUT_DIR = '/vol/moreratsdata/newexperiments-Apr_2025/subtilis_genbank_bifrost/scans/'
 
-INPUT = 'genome.gfa'
-
-OUTPUT_DIR = './output/s'
-
-CONTEXTS = [500,1000,1500,2000,2500,3000,3500,4000]
+CONTEXTS = [100,200,300,400,500]
 
 
 rule all_histogram:
