@@ -50,7 +50,7 @@ rule aggregate_treescale_results_hor:
     output:
         'treescale/z_treescale{scl}_sample{s}/agg.txt'
     shell:
-        'echo {wildcards.scl},$(cat {input.pr}),$(cat {input.ci} | sed "s/Carp index: //") > {output}'
+        'echo {wildcards.scl},$(cat {input.pr}),$(tail -n 1 {input.ci} | sed "s/Carp index: //") > {output}'
 
 rule aggregate_transfer_results:
     input:
