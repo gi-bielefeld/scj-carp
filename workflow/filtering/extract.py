@@ -14,7 +14,7 @@ times = dict()
 def tool_size_filter(fname):
     fname = fname.removesuffix(".txt")
     tool,filters =  fname.split("_s")
-    return tool, int(filters)
+    return tool.split("_")[-1], int(filters)
 
 for f in os.listdir(os.path.join(args.resultdir,"measures")):
     tool, s = tool_size_filter(f)
@@ -27,9 +27,9 @@ for f in os.listdir(os.path.join(args.resultdir,"measures")):
         nmarkers = [int(l.removeprefix("Number of markers: ").strip()) for l in lines if l.startswith("Number of markers: ")][0]
         measures[tool][s]=measure
         marker_nums[tool][s]= nmarkers
+for f in os.listdir(os.path.join(args.resultdir,"bench")):
+    tool, s = tool_size_filter(f)
     with open(os.path.join(args.resultdir,"bench",f)) as fl:
-        tool, s = tool_size_filter(f)
-        with open(os.path.join(args.resultdir,"bench",f)) as fl:
             seconds = float(fl.readlines()[-1].split())
             times[tool][s]=seconds
 
