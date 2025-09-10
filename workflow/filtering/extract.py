@@ -30,7 +30,7 @@ for f in os.listdir(os.path.join(args.resultdir,"measures")):
 for f in os.listdir(os.path.join(args.resultdir,"bench")):
     tool, s = tool_size_filter(f)
     with open(os.path.join(args.resultdir,"bench",f)) as fl:
-            seconds = float(fl.readlines()[-1].split())
+            seconds = float(fl.readlines()[-1].split()[0])
             times[tool][s]=seconds
 
 for tool in measures:
