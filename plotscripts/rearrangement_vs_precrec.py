@@ -12,7 +12,7 @@ get_f1 = lambda e: 2*float(e[1])*float(e[2])/(float(e[1])+float(e[2]))
 X = 0
 YS = ['prec','recall']#,'f1']
 YFUN = [get_precision,get_recall]#,get_f1]
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 24})
 
 
 

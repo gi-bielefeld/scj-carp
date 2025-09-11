@@ -5,7 +5,7 @@ ZOMBI_BIN = ZOMBI_HOME+'Zombi.py'
 ZOMBI_TREE_PARAMS = ZOMBI_HOME + 'Parameters/SpeciesTreeParameters.tsv'
 ZOMBI_GNM_PARAMS = ZOMBI_HOME + 'Parameters/GenomeParameters.tsv'
 
-N_SAMPLES = 100
+N_SAMPLES = 1 #for testing purposes. Original: 100
 T_RATES = [0.125,0.25,0.5,1,2,4,8,16,32]
 TREE_SCALES = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
 

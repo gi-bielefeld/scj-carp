@@ -9,6 +9,7 @@ parser.add_argument("tsv")
 parser.add_argument("--num-buckets",type=int,default=100)
 parser.add_argument("--color-ns",nargs='*',type=int)
 parser.add_argument("--xlabel",default="CARP measure in vicinity of node")
+parser.add_argument("--below",type=int)
 args = parser.parse_args()
 
 
@@ -70,8 +71,12 @@ if args.color_ns:
 plt.ticklabel_format(style='plain', axis='y')
 curr_t = list(range(5000,38000,5000))
 curr_l = curr_t
-plt.xticks(curr_t+[200,600,1500,21500],labels=curr_l+["A","B","C","D"])
+#plt.xticks(curr_t+[200,600,1500,21500],labels=curr_l+["A","B","C","D"])
 plt.xlabel(args.xlabel)
 plt.ylabel("Number of Nodes")
+print("Total number of nodes: ", sum(weights))
+if args.below:
+    print("Total number of nodes below ",args.below,": ",sum([w for e,w in zip(elems,weights) if e <= args.below]))
 #plt.yscale("log")
+plt.xlim(0,args.below)
 plt.show()
