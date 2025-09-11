@@ -157,7 +157,7 @@ rule hal2maf:
         tmpdir=
             '/vol/moreratsdata/tmp/'
     run:
-        shell(f'./scripts/halhelmut_wrapper.sh {input} {output} --chunkSize 500000 --refGenome %s &> {log}'%(REFERENCES[wildcards.run]))
+        shell(f'./scripts/hal_wrapper.sh {input} {output} --chunkSize 500000 --refGenome %s &> {log}'%(REFERENCES[wildcards.run]))
 
 rule maf2syteny_cactus:
     input:
