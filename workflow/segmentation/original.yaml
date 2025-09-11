@@ -1,0 +1,106 @@
+runs:
+ arr10r:
+  reference: 'GCA_000001735'
+  k_sibeliaz: 25
+  genomeFiles:
+    GCA_000001735 : '../arr10r/GCA_000001735.2_TAIR10.1_genomic.fna'
+    GCA_020911765 : '../arr10r/GCA_020911765.2_ASM2091176v2_genomic.fna'
+    GCA_023115395 : '../arr10r/GCA_023115395.1_ASM2311539v1_genomic.fna'
+    GCA_028009825 : '../arr10r/GCA_028009825.2_Col-CC_genomic.fna'
+    GCA_051624255 : '../arr10r/GCA_051624255.1_T8_assembly_genomic.fna'
+    GCA_051624265 : '../arr10r/GCA_051624265.1_F8_assembly_genomic.fna'
+    GCA_946405265 : '../arr10r/GCA_946405265.1_IP-Met-6.PacbioHiFiAssembly_genomic.fna'
+    GCA_946409395 : '../arr10r/GCA_946409395.1_BROU-A-10.PacbioHiFiAssembly_genomic.fna'
+    GCA_946409825 : '../arr10r/GCA_946409825.1_Tanz-1.10024.PacbioHiFiAssembly_genomic.fna'
+    GCA_965117575 : '../arr10r/GCA_965117575.1_LANT-B-10.22040.PacbioHiFiAssembly_genomic.fna'
+ cerevisiae10r:
+  k_sibeliaz: 25
+  reference: 'GCA_000146045'
+  genomeFiles:
+    GCA_000146045 : '../cerevisiae10r/GCA_000146045.2_R64_genomic.fna'
+    GCA_001580425 : '../cerevisiae10r/GCA_001580425.1_ASM158042v1_genomic.fna'
+    GCA_003086655 : '../cerevisiae10r/GCA_003086655.1_ASM308665v1_genomic.fna'
+    GCA_004014915 : '../cerevisiae10r/GCA_004014915.1_ASM401491v1_genomic.fna'
+    GCA_004328465 : '../cerevisiae10r/GCA_004328465.1_ASM432846v1_genomic.fna'
+    GCA_021172205 : '../cerevisiae10r/GCA_021172205.1_ASM2117220v1_genomic.fna'
+    GCA_023508825 : '../cerevisiae10r/GCA_023508825.1_ASM2350882v1_genomic.fna'
+    GCA_024972935 : '../cerevisiae10r/GCA_024972935.1_ASM2497293v1_genomic.fna'
+    GCA_024972955 : '../cerevisiae10r/GCA_024972955.1_ASM2497295v1_genomic.fna'
+    GCA_903819175 : '../cerevisiae10r/GCA_903819175.2_SX2_Assembly_v2_genomic.fna'
+ ecoli10r:
+  k_sibeliaz: 15
+  reference: 'GCA_000005845'
+  genomeFiles:
+    GCA_000005845 : '../ecoli10r/GCA_000005845.2_ASM584v2_genomic.fna'
+    GCA_000008865 : '../ecoli10r/GCA_000008865.2_ASM886v2_genomic.fna'
+    GCA_000010385 : '../ecoli10r/GCA_000010385.1_ASM1038v1_genomic.fna'
+    GCA_000013265 : '../ecoli10r/GCA_000013265.1_ASM1326v1_genomic.fna'
+    GCA_000019645 : '../ecoli10r/GCA_000019645.1_ASM1964v1_genomic.fna'
+    GCA_000210475 : '../ecoli10r/GCA_000210475.1_ASM21047v1_genomic.fna'
+    GCA_002853715 : '../ecoli10r/GCA_002853715.1_ASM285371v1_genomic.fna'
+    GCA_003018455 : '../ecoli10r/GCA_003018455.1_ASM301845v1_genomic.fna'
+    GCA_003697165 : '../ecoli10r/GCA_003697165.2_ASM369716v2_genomic.fna'
+    GCA_048568945 : '../ecoli10r/GCA_048568945.1_ASM4856894v1_genomic.fna'
+ klebsellia10r:
+  k_sibeliaz: 15
+  reference: 'GCA_000240185'
+  genomeFiles:
+    GCA_000240185 : '../klebsellia10r/GCA_000240185.2_ASM24018v2_genomic.fna'
+    GCA_006364295 : '../klebsellia10r/GCA_006364295.1_ASM636429v1_genomic.fna'
+    GCA_011045595 : '../klebsellia10r/GCA_011045595.1_ASM1104559v1_genomic.fna'
+    GCA_020911805 : '../klebsellia10r/GCA_020911805.1_ASM2091180v1_genomic.fna'
+    GCA_022699305 : '../klebsellia10r/GCA_022699305.1_ASM2269930v1_genomic.fna'
+    GCA_022699345 : '../klebsellia10r/GCA_022699345.1_ASM2269934v1_genomic.fna'
+    GCA_022749215 : '../klebsellia10r/GCA_022749215.1_ASM2274921v1_genomic.fna'
+    GCA_022869665 : '../klebsellia10r/GCA_022869665.1_ASM2286966v1_genomic.fna'
+    GCA_043187905 : '../klebsellia10r/GCA_043187905.1_ASM4318790v1_genomic.fna'
+    GCA_050156185 : '../klebsellia10r/GCA_050156185.1_ASM5015618v1_genomic.fna'
+ mel10r:
+  reference: 'GCA_000001215'
+  k_sibeliaz: 25
+  genomeFiles:
+    GCA_000001215 : '../mel10r/GCA_000001215.4_Release_6_plus_ISO1_MT_genomic.fna'
+    GCA_002300595 : '../mel10r/GCA_002300595.1_Dmel_A4_1.0_genomic.fna'
+    GCA_002310755 : '../mel10r/GCA_002310755.1_ASM231075v1_genomic.fna'
+    GCA_003401735 : '../mel10r/GCA_003401735.1_ASM340173v1_genomic.fna'
+    GCA_003401745 : '../mel10r/GCA_003401745.1_ASM340174v1_genomic.fna'
+    GCA_003401925 : '../mel10r/GCA_003401925.1_ASM340192v1_genomic.fna'
+    GCA_003402055 : '../mel10r/GCA_003402055.1_ASM340205v1_genomic.fna'
+    GCA_042606445 : '../mel10r/GCA_042606445.1_ASM4260644v1_genomic.fna'
+    GCA_047116165 : '../mel10r/GCA_047116165.1_ASM4711616v1_genomic.fna'
+    GCA_048772135 : '../mel10r/GCA_048772135.1_ASM4877213v1_genomic.fna'
+ ypestis10r:
+  k_sibeliaz: 15
+  reference: 'GCA_000222975'
+  genomeFiles:
+    GCA_000222975 : '../ypestis10r/GCA_000222975.1_ASM22297v1_genomic.fna'
+    GCA_000834235 : '../ypestis10r/GCA_000834235.1_ASM83423v1_genomic.fna'
+    GCA_000834335 : '../ypestis10r/GCA_000834335.1_ASM83433v1_genomic.fna'
+    GCA_000834495 : '../ypestis10r/GCA_000834495.1_ASM83449v1_genomic.fna'
+    GCA_000834775 : '../ypestis10r/GCA_000834775.1_ASM83477v1_genomic.fna'
+    GCA_003798225 : '../ypestis10r/GCA_003798225.1_ASM379822v1_genomic.fna'
+    GCA_046895405 : '../ypestis10r/GCA_046895405.1_ASM4689540v1_genomic.fna'
+    GCA_046895445 : '../ypestis10r/GCA_046895445.1_ASM4689544v1_genomic.fna'
+    GCA_046895625 : '../ypestis10r/GCA_046895625.1_ASM4689562v1_genomic.fna'
+    GCA_046895675 : '../ypestis10r/GCA_046895675.1_ASM4689567v1_genomic.fna'
+ plasmodium:
+  k_sibeliaz: 15
+  genomeFiles:
+    GCA_000002415 : '../plasmodium/GCA_000002415.2_ASM241v2_genomic.fna'
+    GCA_014843675 : '../plasmodium/GCA_014843675.1_ASM1484367v1_genomic.fna'
+    GCA_014843685 : '../plasmodium/GCA_014843685.1_ASM1484368v1_genomic.fna'
+    GCA_014843935 : '../plasmodium/GCA_014843935.1_ASM1484393v1_genomic.fna'
+    GCA_014843945 : '../plasmodium/GCA_014843945.1_ASM1484394v1_genomic.fna'
+    GCA_900093535 : '../plasmodium/GCA_900093535.1_PvC01_genomic.fna'
+    GCA_900093545 : '../plasmodium/GCA_900093545.1_PvT01_genomic.fna'
+    GCA_900093555 : '../plasmodium/GCA_900093555.2_GCA_900093555_genomic.fna'
+    GCA_900178095 : '../plasmodium/GCA_900178095.1_PvHMP-013_genomic.fna'
+ carp5r:
+  k_sibeliaz: 25
+  reference: 'GCA_018340385'
+  genomeFiles:
+    GCA_000951615 : '../carp5r/GCA_000951615.2_common_carp_genome_genomic.fna'
+    GCA_018340385 : '../carp5r/GCA_018340385.1_ASM1834038v1_genomic.fna'
+    GCA_027406505 : '../carp5r/GCA_027406505.1_ASM2740650v1_genomic.fna'
+    GCA_050881965 : '../carp5r/GCA_050881965.1_ASM5088196v1_genomic.fna'
+    GCA_051167465 : '../carp5r/GCA_051167465.1_ASM5116746v1_genomic.fna'
