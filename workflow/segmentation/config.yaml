@@ -1,8 +1,6 @@
 runs:
- test_plasmodium:
+ SARS-COV2:
   k_sibeliaz: 15
   genomeFiles:
-    GCA_000002415 : '../plasmodium/GCA_000002415.2_ASM241v2_genomic.fna'
-    GCA_014843675 : '../plasmodium/GCA_014843675.1_ASM1484367v1_genomic.fna'
-    GCA_014843685 : '../plasmodium/GCA_014843685.1_ASM1484368v1_genomic.fna'
-
+    GCA_009858895 : 'sc2/GCA_009858895.3_ASM985889v3_genomic.fna'
+    GCA_011545035 : 'sc2/GCA_011545035.1_nCoV-SH01_genomic.fna'
