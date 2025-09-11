@@ -82,6 +82,7 @@ rule generate_filelist:
 
 
 def genome_files_per_run(wildcards):
+    print("lololololo",wildcards.run)
     return GENOMEFILES_PER_RUN[wildcards.run]
 
 rule run_minigraph:
