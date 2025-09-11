@@ -1,7 +1,5 @@
-
+#
 configfile: 'config.yaml'
-
-
 
 from datetime import datetime
 RUN_LIST = config.get('run_list',list(config['runs'].keys()))
@@ -11,20 +9,21 @@ GNM_MAPS = dict([(run,x['genomeFiles']) for run,x in RUNS.items()])
 
 
 DEFAULT_K_SIBELIAZ = config.get('k_sibeliaz',25)
-KS_SIBELIAZ = dict([(run,x.get('genomeFiles',DEFAULT_K_SIBELIAZ)) for run,x in RUNS.items()])
+KS_SIBELIAZ = dict([(run,x.get('k_sibeliaz',DEFAULT_K_SIBELIAZ)) for run,x in RUNS.items()])
 
 GENOMEFILES_PER_RUN = dict([(run,sorted(list(x['genomeFiles'].values()))) for run,x in RUNS.items()])
+print(GENOMEFILES_PER_RUN)
 REFERENCES = dict([(run, x.get('reference',min(GNM_MAPS[run].keys()))) for run,x in RUNS.items()])
-CARP_PATH = "../../target/release/carp"
+CARP_PATH = "~/tools/carp/target/release"
 SIZE_THRESH = 0
 CONTEXT_LENGTH = 10
 
-AS_SIBELIAZ = dict([(run,x.get('a_sibeliaz',[2*len(GENOMEFILES_PER_RUN[run])])) for run,x in RUNS.items()])
+AS_SIBELIAZ = dict([(run,x.get('a_sibeliaz',[2*len(GENOMEFILES_PER_RUN[run]),2*10*len(GENOMEFILES_PER_RUN[run])])) for run,x in RUNS.items()])
 
 rule all_carp:
     input:
         carp_cactus=expand('{run}/carp/{tool}_perm.txt',run=RUN_LIST,tool=['cactus']),
-        carp_graph= expand('{run}/carp/{gtool}_graph.txt',run=RUN_LIST,gtool=['minigraph']),
+        #carp_graph= expand('{run}/carp/{gtool}_graph.txt',run=RUN_LIST,gtool=['minigraph']),
         carp_sibeliaz=['{run}/carp/sibeliaz_a{a}_perm.txt'.format(run=run,a=a) for run in RUN_LIST for a in AS_SIBELIAZ[run]]
 
 
@@ -43,7 +42,7 @@ rule run_carp_unimog:
     threads:
         4
     shell:
-        "%s/carp --unimog {input} -s {params.size_thresh} -t {threads} > {output} 2> {log}"%CARP_PATH
+        "%s/carp --unimog {input} -t {threads} > {output} 2> {log}"%CARP_PATH
 
 rule run_carp_graph:
     input:
@@ -103,7 +102,7 @@ rule run_minigraph:
         ref_file = GNM_MAPS[wildcards.run][REFERENCES[wildcards.run]]
         rest = [x for x in GENOMEFILES_PER_RUN[wildcards.run] if x!=ref_file]
         order = ref_file + " " + " ".join(rest)
-        shell("./scripts/minigraph_wrapper.sh -cxggs -t {threads} %s > {output} 2> {log}"%(order))
+        shell("~/tools/minigraph/minigraph -cxggs -t {threads} %s > {output} 2> {log}"%order)
 
 
 rule run_bifrost:
@@ -121,7 +120,7 @@ rule run_bifrost:
         tmpdir=
             '/vol/moreratsdata/tmp/'
    shell:
-       './scripts/bifrost_wrapper.sh -s {input} -o {wildcards.run}/graphs/bifrost/graph -t {threads} > {log}'
+       '~/tools/bifrost/build/src/Bifrost build -s {input} -o {wildcards.run}/graphs/bifrost/graph -t {threads} > {log}'
 
 
 
@@ -129,7 +128,7 @@ def k_sibeliaz(wildcards):
     return KS_SIBELIAZ[wildcards.run]
 
 def a_sibeliaz(wildcards):
-    return AS_SIBELIAZ[wildcards.a]
+    return wildcards.a
 
 rule run_sibeliaz:
     input:
@@ -148,9 +147,9 @@ rule run_sibeliaz:
     params:
         k = k_sibeliaz,
         a = a_sibeliaz
-    shell:
-        './scripts/sibeliaz_wrapper.sh -k {params.k} -a {params.a} -o {wildcards.run}/run_sibeliaz -n -t {threads} {input}  &> {log}'
-
+    run:
+        cmd=(f'./scripts/sibeliaz_wrapper.sh -k {params.k} -a {params.a} -o {wildcards.run}/run_sibeliaz_a{wildcards.a} -n -t {threads} %s &> {log}')%(" ".join(input))
+	shell(cmd)
 
 rule maf2synteny_sibeliaz:
     input:
@@ -165,10 +164,10 @@ rule maf2synteny_sibeliaz:
         tmpdir=
             '/vol/moreratsdata/tmp/'
     shell:
-        './scripts/maf2synteny_wrapper.sh {input} -o {wildcards.run}/sibeliaz/ &> {log}'
+        './scripts/maf2synteny_wrapper.sh {input} -o {wildcards.run}/sibeliaz_a{wildcards.a}/ &> {log}'
 
 
-rule synteny2unimog:
+rule synteny2unimogbad:
     input:
         '{run}/{tool}/5000/genomes_permutations.txt'
     priority:
@@ -222,7 +221,7 @@ rule hal2maf:
         tmpdir=
             '/vol/moreratsdata/tmp/'
     run:
-        shell(f'./scripts/hal_wrapper.sh {input} {output} --chunkSize 500000 --refGenome %s &> {log}'%(REFERENCES[wildcards.run]))
+        shell(f'./scripts/halhelmut_wrapper.sh {input} {output} --chunkSize 500000 --refGenome %s &> {log}'%(REFERENCES[wildcards.run]))
 
 rule maf2syteny_cactus:
     input:
