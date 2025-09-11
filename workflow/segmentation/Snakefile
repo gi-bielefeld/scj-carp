@@ -14,6 +14,7 @@ DEFAULT_K_SIBELIAZ = config.get('k_sibeliaz',25)
 KS_SIBELIAZ = dict([(run,x.get('genomeFiles',DEFAULT_K_SIBELIAZ)) for run,x in RUNS.items()])
 
 GENOMEFILES_PER_RUN = dict([(run,sorted(list(x['genomeFiles'].values()))) for run,x in RUNS.items()])
+print(GENOMEFILES_PER_RUN)
 REFERENCES = dict([(run, x.get('reference',min(GNM_MAPS[run].keys()))) for run,x in RUNS.items()])
 CARP_PATH = "../../target/release/carp"
 SIZE_THRESH = 0
@@ -83,6 +84,7 @@ rule generate_filelist:
 
 
 def genome_files_per_run(wildcards):
+    print("lololololo",wildcards.run)
     return GENOMEFILES_PER_RUN[wildcards.run]
 
 rule run_minigraph:
