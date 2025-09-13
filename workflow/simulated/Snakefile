@@ -12,7 +12,7 @@ N_SAMPLES = config['n_samples']
 T_RATES = config['transfer_rates']
 TREE_SCALES = config['tree_scales']
 
-rule all_treescale_results:
+rule all_treescale:
     input:
         expand('treescale/z_treescale{scl}_sample{s}/agg.txt',scl=TREE_SCALES,s=range(1,N_SAMPLES+1))
     output:
