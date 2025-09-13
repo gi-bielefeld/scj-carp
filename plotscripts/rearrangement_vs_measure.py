@@ -12,7 +12,7 @@ X = 0
 YS = ['measure']
 YFUN = [get_measure]
 
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 24})
 
 
 

@@ -1,0 +1,6 @@
+runs:
+ SARS-COV2:
+  k_sibeliaz: 15
+  genomeFiles:
+    GCA_009858895 : 'sc2/GCA_009858895.3_ASM985889v3_genomic.fna'
+    GCA_011545035 : 'sc2/GCA_011545035.1_nCoV-SH01_genomic.fna'

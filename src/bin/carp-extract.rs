@@ -5,7 +5,7 @@ use scj_carp_rust::mbg::MBG;
 use scj_carp_rust::rearrangement::RearrangementGraph;
 use scj_carp_rust::scan::adjacency_neighborhood;
 use scj_carp_rust::gfa::partial2gfa;
-
+use scj_carp_rust::measure::carp_measure_from_adjacencies;
 fn main() {
     let matches = Command::new("filter")
         .arg(arg!(-s --"size-thresh" <st> "Size threshold for nodes (nodes of lower sizes are discarded)")
@@ -55,5 +55,6 @@ fn main() {
     let max_dist : usize = *matches.get_one(&"max-dist").expect("CLI Parsing gone wrong");
     let marker = graph.name_to_marker(&start_node).expect("Given node is not part of the (trimmed) graph. Make sure that this node id exists and try a lower size threshold.");
     let adjacencies = adjacency_neighborhood(marker, max_dist, &graph);
+    eprintln!("{}",carp_measure_from_adjacencies(&adjacencies));
     partial2gfa(&graph, &adjacencies);
 }

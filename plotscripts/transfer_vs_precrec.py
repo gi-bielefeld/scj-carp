@@ -12,7 +12,7 @@ get_rec = lambda e: float(e[3])
 X = 0
 YS = ['prec','recall']
 YFUN = [get_prec,get_rec]
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 24})
 
 
 

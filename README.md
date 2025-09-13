@@ -30,7 +30,7 @@ This program calculates the SCJ CARP measure for the given pangenome and outputs
 
 <details><summary>Example</summary>
 
-`./target/release/carp --gfa test.gfa -m test_measure.txt -a test_ancestor.txt `
+`./target/release/carp --gfa testfiles/test_ypestis.gfa -t 4 -m test_measure.txt -s 100 -a test_ancestor.txt`
 
 </details>
 
@@ -49,13 +49,17 @@ It can output the a certain percentile of nodes by surrounding complexity as ide
 
 `--higher-percentile <hi>`  Output node ids that lie between the lower and higher percentile to standard output. Default 1.00.
 
+`--ignore-gfa-overlap`      Ignore the overlaps specified in the GFA for environment extraction. This parameter has to be used when filtering nodes as currently variable overlaps between nodes are not supported.
+
 <details><summary>Example</summary>
 
-`./target/release/carp-scan --gfa test.gfa  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
+`./target/release/carp-scan --gfa testfiles/test_ypestis.gfa -t 4  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
 
 View the histogram with: ` python3 plotscripts/plot_hist.py test.hist  --num-buckets 1000`
 
 Open `test_colored.gfa` in bandage for a visualization of node complexities.
+
+Use `python3 plotscripts/gradient.py test_colored.gfa` to obtain the color gradient used in the gfa file to color the nodes in bandage.
 </details>
 
 ### `carp-extract`

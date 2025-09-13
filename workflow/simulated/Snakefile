@@ -1,16 +1,18 @@
 
-
-ZOMBI_HOME = '/prj/gsp/urm/spp_dcj_v2/tools/ZOMBI_01042020/'
-ZOMBI_BIN = ZOMBI_HOME+'Zombi.py'
-ZOMBI_TREE_PARAMS = ZOMBI_HOME + 'Parameters/SpeciesTreeParameters.tsv'
-ZOMBI_GNM_PARAMS = ZOMBI_HOME + 'Parameters/GenomeParameters.tsv'
-
-N_SAMPLES = 100
-T_RATES = [0.125,0.25,0.5,1,2,4,8,16,32]
-TREE_SCALES = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+import os
+configfile: 'config.yaml'
 
 
-rule all_treescale_results:
+ZOMBI_HOME = config['zombi_home']
+ZOMBI_BIN = os.path.join(ZOMBI_HOME,'Zombi.py')
+ZOMBI_TREE_PARAMS = os.path.join(ZOMBI_HOME,'Parameters','SpeciesTreeParameters.tsv')
+ZOMBI_GNM_PARAMS = os.path.join(ZOMBI_HOME, 'Parameters','GenomeParameters.tsv')
+
+N_SAMPLES = config['n_samples'] 
+T_RATES = config['transfer_rates']
+TREE_SCALES = config['tree_scales']
+
+rule all_treescale:
     input:
         expand('treescale/z_treescale{scl}_sample{s}/agg.txt',scl=TREE_SCALES,s=range(1,N_SAMPLES+1))
     output:
@@ -22,7 +24,7 @@ rule all_transfer:
     input:
         expand('transferexp/z_transfer{t}/results.txt',t=T_RATES)
     output:
-        'transferexp/transfercarp.txt'
+        'transferexp/transfer.txt'
     shell:
         'cat {input} > {output}'
         
@@ -50,7 +52,7 @@ rule aggregate_treescale_results_hor:
     output:
         'treescale/z_treescale{scl}_sample{s}/agg.txt'
     shell:
-        'echo {wildcards.scl},$(cat {input.pr}),$(cat {input.ci} | sed "s/Carp index: //") > {output}'
+        'echo {wildcards.scl},$(cat {input.pr}),$(tail -n 1 {input.ci} | sed "s/Carp index: //") > {output}'
 
 rule aggregate_transfer_results:
     input:

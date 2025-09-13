@@ -1,15 +1,15 @@
 
+configfile: 'config.yaml'
 
-INPUT_DIR='/vol/moreratsdata/homo/'
-INPUT_GENOMES=["hprc-v1.0-mc-chm13", "hprc-v1.0-minigraph-chm13", "hprc-v1.0-pggb"]
-OUTPUT_DIR = '/vol/moreratsdata/homo/results'
+INPUT_DIR=config['input_dir']
+INPUT_GRAPHS=config['input_graphs']
+OUTPUT_DIR = config['output_dir']
 
-SIZE_THRESHOLDS = [0,50,100,200,400,800,1600]
-
+SIZE_THRESHOLDS = config['size_thresholds']
 
 rule all_measure:
     input:
-        expand(OUTPUT_DIR+"measures/{genome}_s{size}.txt",genome=INPUT_GENOMES,size=SIZE_THRESHOLDS)
+        expand(OUTPUT_DIR+"measures/{genome}_s{size}.txt",genome=INPUT_GRAPHS,size=SIZE_THRESHOLDS)
 
 rule calc_measure:
     input:

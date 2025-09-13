@@ -1,0 +1,175 @@
+#
+configfile: 'config.yaml'
+
+from datetime import datetime
+RUN_LIST = config.get('run_list',list(config['runs'].keys()))
+RUNS = config['runs']
+GNM_MAPS = dict([(run,x['genomeFiles']) for run,x in RUNS.items()])
+
+
+
+DEFAULT_K_SIBELIAZ = config.get('k_sibeliaz',25)
+KS_SIBELIAZ = dict([(run,x.get('k_sibeliaz',DEFAULT_K_SIBELIAZ)) for run,x in RUNS.items()])
+
+GENOMEFILES_PER_RUN = dict([(run,sorted(list(x['genomeFiles'].values()))) for run,x in RUNS.items()])
+print(GENOMEFILES_PER_RUN)
+REFERENCES = dict([(run, x.get('reference',min(GNM_MAPS[run].keys()))) for run,x in RUNS.items()])
+CARP_PATH = "~/tools/carp/target/release"
+SIZE_THRESH = 0
+CONTEXT_LENGTH = 10
+
+AS_SIBELIAZ = dict([(run,x.get('a_sibeliaz',[2*len(GENOMEFILES_PER_RUN[run]),2*10*len(GENOMEFILES_PER_RUN[run])])) for run,x in RUNS.items()])
+
+rule all_carp:
+    input:
+        carp_cactus=expand('{run}/carp/{tool}_perm.txt',run=RUN_LIST,tool=['cactus']),
+        carp_sibeliaz=['{run}/carp/sibeliaz_a{a}_perm.txt'.format(run=run,a=a) for run in RUN_LIST for a in AS_SIBELIAZ[run]]
+
+
+
+
+
+rule run_carp_unimog:
+    input:
+        '{run}/unimogs/{gtool}/perm.ug'
+    output:
+        '{run}/carp/{gtool}_perm.txt'
+    log:
+        '{run}/carp/{gtool}_perm.log'
+    benchmark:
+        "{run}/benchmarks/carp_perm/{gtool}.txt"
+    threads:
+        4
+    shell:
+        "%s/carp --unimog {input} -t {threads} > {output} 2> {log}"%CARP_PATH
+
+
+
+rule generate_filelist:
+    input:
+        '{run}/cactus/cactusin.txt'
+    output:
+        '{run}/graphs/bifrost/filelist.txt'
+    shell:
+        'cut -f 2 {input} > {output}'
+
+
+
+def genome_files_per_run(wildcards):
+    return GENOMEFILES_PER_RUN[wildcards.run]
+
+
+
+def k_sibeliaz(wildcards):
+    return KS_SIBELIAZ[wildcards.run]
+
+def a_sibeliaz(wildcards):
+    return wildcards.a
+
+rule run_sibeliaz:
+    input:
+        genome_files_per_run
+    priority:
+        100
+    output:
+        '{run}/run_sibeliaz_a{a}/blocks_coords.gff'
+    threads:
+        16
+    log:
+         '{run}/run_sibeliaz_a{a}/sbz.log'
+    resources:
+        tmpdir=
+            '/vol/moreratsdata/tmp/'
+    params:
+        k = k_sibeliaz,
+        a = a_sibeliaz
+    run:
+        cmd=(f'./scripts/sibeliaz_wrapper.sh -k {params.k} -a {params.a} -o {wildcards.run}/run_sibeliaz_a{wildcards.a} -n -t {threads} %s &> {log}')%(" ".join(input))
+	shell(cmd)
+
+rule maf2synteny_sibeliaz:
+    input:
+        '{run}/run_sibeliaz_a{a}/blocks_coords.gff'
+    priority:
+        100
+    output:
+        '{run}/sibeliaz_a{a}/5000/genomes_permutations.txt'
+    log:
+        '{run}/sibeliaz_a{a}/maf2syn.log'
+    resources:
+        tmpdir=
+            '/vol/moreratsdata/tmp/'
+    shell:
+        './scripts/maf2synteny_wrapper.sh {input} -o {wildcards.run}/sibeliaz_a{wildcards.a}/ &> {log}'
+
+
+rule synteny2unimogbad:
+    input:
+        '{run}/{tool}/5000/genomes_permutations.txt'
+    priority:
+        100
+    output:
+        '{run}/unimogs/{tool}/perm.ug'
+    shell:
+        'cat {input} | tr "$" "|" > {output}'
+
+
+
+
+rule make_cactusin:
+    output:
+        '{run}/cactus/cactusin.txt'
+    priority:
+        100
+    run:
+        with open(output[0],'w') as f:
+            for x,y in GNM_MAPS[wildcards.run].items():
+                print(x+"\t"+y,file=f)
+
+rule cactus:
+    input:
+        '{run}/cactus/cactusin.txt'
+    output:
+        hal='{run}/cactus/pg/pg.full.hal',
+        graph='{run}/cactus/pg/pg.gfa.gz'
+    log:
+        '{run}/cactus/cactus.log'
+    priority:
+        100
+    threads:
+        28
+    resources:
+        tmpdir=
+            '/vol/moreratsdata/tmp/'
+    run:
+        shell(f'./scripts/cactus_wrapper.sh {input} --outDir {wildcards.run}/cactus/pg/ --outName pg --reference %s &> {log}'%(REFERENCES[wildcards.run]))
+
+rule hal2maf:
+    input:
+        '{run}/cactus/pg/pg.full.hal'
+    output:
+        '{run}/cactus/pg.maf'
+    log:
+        '{run}/cactus/hal2maf.log'
+    priority:
+        100
+    resources:
+        tmpdir=
+            '/vol/moreratsdata/tmp/'
+    run:
+        shell(f'./scripts/hal_wrapper.sh {input} {output} --chunkSize 500000 --refGenome %s &> {log}'%(REFERENCES[wildcards.run]))
+
+rule maf2syteny_cactus:
+    input:
+        '{run}/cactus/pg.maf'
+    output:
+        '{run}/cactus/5000/genomes_permutations.txt'
+    log:
+        '{run}/cactus/maf2syn.log'
+    priority:
+        100
+    resources:
+        tmpdir=
+            '/vol/moreratsdata/tmp/'
+    shell:
+        './scripts/maf2synteny_wrapper.sh {input} -o {wildcards.run}/cactus/ &> {log}'

@@ -9,6 +9,7 @@ parser.add_argument("tsv")
 parser.add_argument("--num-buckets",type=int,default=100)
 parser.add_argument("--color-ns",nargs='*',type=int)
 parser.add_argument("--xlabel",default="CARP measure in vicinity of node")
+parser.add_argument("--below",type=int)
 args = parser.parse_args()
 
 
@@ -56,8 +57,8 @@ if args.color_ns:
     n_colors = len(args.color_ns)
 else:
     n_colors = 1
-cmap = plt.get_cmap('inferno')
-colors = [cmap(i) for i in np.linspace(0, 1, n_colors)]
+cmap = plt.get_cmap('magma')
+colors = [cmap(i) for i in np.linspace(0, 0.8, n_colors)]
 
 
 plt.bar(bucket_centers,buckets,width=(mx-mn)/args.num_buckets,color=colors[0])
@@ -66,10 +67,16 @@ if args.color_ns:
     for lo,hi,cl in zip(args.color_ns,args.color_ns[1::],colors[1::]):
         plt.bar(bucket_centers[lo:hi],buckets[lo:hi],width=(mx-mn)/args.num_buckets,color=cl)
 
+
+plt.ticklabel_format(style='plain', axis='y')
 curr_t = list(range(5000,38000,5000))
 curr_l = curr_t
-#plt.xticks(curr_t+[100,500,1500,35000],labels=curr_l+["A","B","C","D"])
+#plt.xticks(curr_t+[200,600,1500,21500],labels=curr_l+["A","B","C","D"])
 plt.xlabel(args.xlabel)
 plt.ylabel("Number of Nodes")
+print("Total number of nodes: ", sum(weights))
+if args.below:
+    print("Total number of nodes below ",args.below,": ",sum([w for e,w in zip(elems,weights) if e <= args.below]))
 #plt.yscale("log")
+plt.xlim(0,args.below)
 plt.show()
