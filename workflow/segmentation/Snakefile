@@ -150,7 +150,7 @@ rule hal2maf:
     output:
         '{run}/cactus/pg.maf'
     log:
-        '{run}/cactus/helmut.log'
+        '{run}/cactus/hal2maf.log'
     priority:
         100
     resources:

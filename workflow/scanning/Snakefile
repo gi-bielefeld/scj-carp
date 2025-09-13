@@ -1,8 +1,11 @@
-INPUT = '/vol/moreratsdata/newexperiments-Apr_2025/subtilis_genbank_bifrost/graph.gfa.gz'
 
-OUTPUT_DIR = '/vol/moreratsdata/newexperiments-Apr_2025/subtilis_genbank_bifrost/scans/'
+configfile: 'config.yaml'
 
-CONTEXTS = [100,200,300,400,500]
+INPUT = config['input_graph']
+
+OUTPUT_DIR = config['output_dir']#'/vol/moreratsdata/newexperiments-Apr_2025/subtilis_genbank_bifrost/scans/'
+
+CONTEXTS = config['contexts']#[100,200,300,400,500]
 
 
 rule all_histogram:
