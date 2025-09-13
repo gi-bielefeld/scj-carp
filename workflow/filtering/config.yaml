@@ -2,5 +2,5 @@
 
 input_dir : '/vol/moreratsdata/homo/'
 input_graphs : ["hprc-v1.0-mc-chm13", "hprc-v1.0-minigraph-chm13", "hprc-v1.0-pggb"]
-output_dir : ['/vol/moreratsdata/homo/results']
+output_dir : '/vol/moreratsdata/homo/results/'
 size_thresholds : [0,50] #For testing, full experiment: [0,50,100,150,200,250]
