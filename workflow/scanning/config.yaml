@@ -1,0 +1,7 @@
+
+#TODO: adapt this to your file path
+input_graph : "./testgraph.gfa"
+
+output_dir : "./scans/"
+
+contexts : [100] # original: [100,200,300,400,500]
