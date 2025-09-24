@@ -11,7 +11,7 @@ Note: This version only includes the programs `carp`, `carp-scan` and `carp-extr
 
 ### Building from source
 
-Clone this repository, install `rust`/`cargo` and run:
+Install `rust`/`cargo`, clone this repository and run:
 
 `cargo build --release`
 
