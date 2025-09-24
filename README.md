@@ -48,7 +48,7 @@ This program calculates the SCJ CARP measure for the given pangenome and outputs
 ### `carp-scan`
 
 This program calculates the SCJ CARP measure for the environment of each node in the (trimmed) graph.
-It can output the a certain percentile of nodes by surrounding complexity as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
+It can output a certain percentile of nodes by surrounding complexity as identified by the SCJ CARP measure, but it can also color the graph by complexity and output a histogram of complexities.
 
 `-c`, `--context-len <c>` Defines the context length `<c>` in base pairs that will be regarded around each node. Note that since unimog does not support node lengths, for unimog files this is instead the number of nodes in the context.
 
