@@ -1,5 +1,4 @@
-# CARP
-![CARP LOGO](carptrace_plain.svg)
+![CARP LOGO](carptrace_banner.svg)
 
 ### Installing from bioconda
 
