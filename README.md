@@ -1,6 +1,17 @@
-# SCJ-CARP
+# CARP
 ![CARP LOGO](carptrace_plain.svg)
-## How to build
+
+### Installing from bioconda
+
+(SCJ-)CARP can be installed as `carp` from bioconda. Create/switch to the environment in which you want to use the carp software and run:
+
+`conda install -c bioconda carp`
+
+Note: This version only includes the programs `carp`, `carp-scan` and `carp-extract`, not currently the python utility scripts or workflows included in this repository.
+
+### Building from source
+
+Clone this repository, install `rust`/`cargo` and run:
 
 `cargo build --release`
 
@@ -30,7 +41,7 @@ This program calculates the SCJ CARP measure for the given pangenome and outputs
 
 <details><summary>Example</summary>
 
-`./target/release/carp --gfa testfiles/test_ypestis.gfa -t 4 -m test_measure.txt -s 100 -a test_ancestor.txt`
+`carp --gfa testfiles/test_ypestis.gfa -t 4 -m test_measure.txt -s 100 -a test_ancestor.txt`
 
 </details>
 
@@ -53,7 +64,7 @@ It can output the a certain percentile of nodes by surrounding complexity as ide
 
 <details><summary>Example</summary>
 
-`./target/release/carp-scan --gfa testfiles/test_ypestis.gfa -t 4  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
+`carp-scan --gfa testfiles/test_ypestis.gfa -t 4  --context-len 2000 --lower-percentile 0.49 --higher-percentile 0.51 --output-histogram test.hist --colored-gfa test_colored.gfa  > test_average_nodes.txt `
 
 View the histogram with: ` python3 plotscripts/plot_hist.py test.hist  --num-buckets 1000`
 
